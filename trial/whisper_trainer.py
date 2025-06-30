@@ -1,25 +1,29 @@
 from datasets import load_dataset, Audio, Dataset
 import json
+import os
 
+sr = 22050
+root_dir = 'dataset/shanghai'
 # 读取我们刚准备的数据
-with open("whisper_finetune_data.jsonl", "r", encoding="utf8") as f:
+with open(os.path.join(root_dir,"whisper_finetune_data.jsonl"), "r", encoding="utf8") as f:
     lines = [json.loads(line) for line in f]
 
 # 转成 Hugging Face Dataset
 dataset = Dataset.from_list(lines)
-dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
+dataset = dataset.cast_column("audio", Audio(sampling_rate=sr))
 
 # 加载模型和分词器
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
-model_name = "openai/whisper-small"
+# model_name = "openai/whisper-small"
+model_name = "pretrained_models/transformer_small/snapshots/973afd24965f72e36ca33b3055d56a652f456b4d"
 processor = WhisperProcessor.from_pretrained(model_name)
 model = WhisperForConditionalGeneration.from_pretrained(model_name)
 
 # 数据预处理
 def preprocess(example):
     audio = example["audio"]
-    input_features = processor(audio["array"], sampling_rate=16000, return_tensors="pt").input_features[0]
+    input_features = processor(audio["array"], sampling_rate=sr, return_tensors="pt").input_features[0]
     labels = processor.tokenizer(example["text"], return_tensors="pt").input_ids[0]
     example["input_features"] = input_features
     example["labels"] = labels
