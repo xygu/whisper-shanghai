@@ -1,0 +1,126 @@
+(/mnt/workspace/workgroup/qq/qq-env/whisper) /mnt/workspace/workgroup/qq/ts/whisper> python find_tune/train_translation.py \
+    --model_name google/mt5-small \
+    --dataset_path dataset/shanghai/translation_dataset \
+    --num_train_epochs 10 \
+    --batch_size 8 \
+    --learning_rate 5e-5
+============================================================
+上海话到普通话翻译模型训练
+============================================================
+
+✓ 已配置 HuggingFace 镜像: https://hf-mirror.com
+
+配置信息:
+  模型: google/mt5-small
+  数据集: dataset/shanghai/translation_dataset
+  输出目录: ./exp/translation-mt5-small-260320-182507
+  训练轮数: 10
+  批次大小: 8
+  学习率: 5e-05
+  设备: cuda
+  混合精度: True
+
+加载数据集: dataset/shanghai/translation_dataset
+✓ 训练样本: 3251
+✓ 测试样本: 362
+
+加载模型: google/mt5-small
+The tokenizer class you load from this checkpoint is not the same type as the class this function is called from. It may result in unexpected tokenization. 
+The tokenizer class you load from this checkpoint is 'T5Tokenizer'. 
+The class this function is called from is 'MT5Tokenizer'.
+You are using the default legacy behaviour of the <class 'transformers.models.mt5.tokenization_mt5.MT5Tokenizer'>. This is expected, and simply means that the `legacy` (previous) behavior will be used so nothing changes for you. If you want to use the new behaviour, set `legacy=False`. This should only be set if you understand what it means, and thoroughly read the reason why this was added as explained in https://github.com/huggingface/transformers/pull/24565
+✓ 模型加载完成
+  模型参数量: 300.2M
+
+预处理数据集...
+✓ 数据预处理完成
+
+加载评估指标...
+Using the latest cached version of the module from /root/.cache/huggingface/modules/evaluate_modules/metrics/evaluate-metric--bleu/9e0985c1200e367cce45605ce0ecb5ede079894e0f24f54613fca08eeb8aff76 (last modified on Thu Mar 19 00:29:21 2026) since it couldn't be found locally at evaluate-metric--bleu, or remotely on the Hugging Face Hub.
+✓ 评估指标加载完成
+/mnt/workspace/workgroup/qq/ts/whisper/find_tune/train_translation.py:249: FutureWarning: `tokenizer` is deprecated and will be removed in version 5.0.0 for `Seq2SeqTrainer.__init__`. Use `processing_class` instead.
+  trainer = Seq2SeqTrainer(
+Detected kernel version 4.19.91, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
+
+============================================================
+开始训练...
+============================================================
+
+  0%|                                                                                                               | 0/1020 [00:00<?, ?it/s]dsw92354-5548566499-g9hsl:55887:55887 [0] NCCL INFO cudaDriverVersion 12040
+dsw92354-5548566499-g9hsl:55887:55887 [0] NCCL INFO Bootstrap : Using eth0:33.78.37.208<0>
+dsw92354-5548566499-g9hsl:55887:55887 [0] NCCL INFO NET/Plugin: No plugin found (libnccl-net.so)
+dsw92354-5548566499-g9hsl:55887:55887 [0] NCCL INFO NET/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-net.so
+dsw92354-5548566499-g9hsl:55887:55887 [0] NCCL INFO NET/Plugin: Using internal network plugin.
+NCCL version 2.21.5+cuda11.0
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO NET/IB : No device found.
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO NET/Socket : Using [0]eth0:33.78.37.208<0>
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO Using non-device net plugin version 0
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO Using network Socket
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO Using non-device net plugin version 0
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO Using network Socket
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO ncclCommInitRank comm 0x55ebc48594c0 rank 1 nranks 2 cudaDev 1 nvmlDev 1 busId dc000 commId 0x98652a783334e74f - Init START
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO ncclCommInitRank comm 0x55ebc4855520 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId db000 commId 0x98652a783334e74f - Init START
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO comm 0x55ebc48594c0 rank 1 nRanks 2 nNodes 1 localRanks 2 localRank 1 MNNVL 0
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO comm 0x55ebc4855520 rank 0 nRanks 2 nNodes 1 localRanks 2 localRank 0 MNNVL 0
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO NCCL_MAX_NCHANNELS set by environment to 2.
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO NCCL_MIN_NCHANNELS set by environment to 2.
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO Trees [0] -1/-1/-1->1->0 [1] -1/-1/-1->1->0
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO Channel 00/02 :    0   1
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO P2P Chunksize set to 524288
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO Channel 01/02 :    0   1
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 1/-1/-1->0->-1
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO P2P Chunksize set to 524288
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO Channel 00/0 : 1[1] -> 0[0] via P2P/direct pointer
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/direct pointer
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO Channel 01/0 : 1[1] -> 0[0] via P2P/direct pointer
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[1] via P2P/direct pointer
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO Connected all rings
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO Connected all rings
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO Connected all trees
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO Connected all trees
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO threadThresholds 8/8/64 | 16/8/64 | 512 | 512
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO 2 coll channels, 2 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO threadThresholds 8/8/64 | 16/8/64 | 512 | 512
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO 2 coll channels, 2 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO NCCL_LAUNCH_MODE set by environment to PARALLEL
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO TUNER/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-tuner.so
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO TUNER/Plugin: Using internal tuner plugin.
+dsw92354-5548566499-g9hsl:55887:56577 [1] NCCL INFO ncclCommInitRank comm 0x55ebc48594c0 rank 1 nranks 2 cudaDev 1 nvmlDev 1 busId dc000 commId 0x98652a783334e74f - Init COMPLETE
+dsw92354-5548566499-g9hsl:55887:56576 [0] NCCL INFO ncclCommInitRank comm 0x55ebc4855520 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId db000 commId 0x98652a783334e74f - Init COMPLETE
+Passing a tuple of `past_key_values` is deprecated and will be removed in Transformers v4.48.0. You should pass an instance of `EncoderDecoderCache` instead, e.g. `past_key_values=EncoderDecoderCache.from_legacy_cache(past_key_values)`.
+/mnt/workspace/workgroup/qq/qq-env/whisper/lib/python3.9/site-packages/torch/nn/parallel/_functions.py:71: UserWarning: Was asked to gather along dimension 0, but all input tensors were scalars; will instead unsqueeze and return a vector.
+  warnings.warn(
+{'loss': 23.6824, 'grad_norm': 148870928.0, 'learning_rate': 1.225e-05, 'epoch': 0.49}                                                       
+{'eval_loss': 11.461904525756836, 'eval_bleu': 0.0, 'eval_rouge1': 0.0, 'eval_rouge2': 0.0, 'eval_rougeL': 0.0, 'eval_runtime': 4.0845, 'eval_samples_per_second': 88.628, 'eval_steps_per_second': 5.631, 'epoch': 0.49}                                                                 
+{'loss': 18.6126, 'grad_norm': 104943352.0, 'learning_rate': 2.4750000000000002e-05, 'epoch': 0.98}                                          
+{'eval_loss': 7.642996311187744, 'eval_bleu': 0.0, 'eval_rouge1': 0.0, 'eval_rouge2': 0.0, 'eval_rougeL': 0.0, 'eval_runtime': 5.5285, 'eval_samples_per_second': 65.478, 'eval_steps_per_second': 4.16, 'epoch': 0.98}                                                                   
+ 10%|█████████▉                                                                                           | 100/1020 [00:51<07:08,  2.15it/s/mnt/workspace/workgroup/qq/qq-env/whisper/lib/python3.9/site-packages/torch/nn/parallel/_functions.py:71: UserWarning: Was asked to gather along dimension 0, but all input tensors were scalars; will instead unsqueeze and return a vector.
+  warnings.warn(
+{'loss': 12.4667, 'grad_norm': 35837676.0, 'learning_rate': 3.7250000000000004e-05, 'epoch': 1.47}                                           
+{'eval_loss': 5.6776227951049805, 'eval_bleu': 0.0, 'eval_rouge1': 0.0, 'eval_rouge2': 0.0, 'eval_rougeL': 0.0, 'eval_runtime': 40.5533, 'eval_samples_per_second': 8.927, 'eval_steps_per_second': 0.567, 'epoch': 1.47}                                                                 
+{'loss': 8.7371, 'grad_norm': 5853462.0, 'learning_rate': 4.975e-05, 'epoch': 1.96}                                                          
+{'eval_loss': 4.940896987915039, 'eval_bleu': 0.0, 'eval_rouge1': 0.0, 'eval_rouge2': 0.0, 'eval_rougeL': 0.0, 'eval_runtime': 39.578, 'eval_samples_per_second': 9.146, 'eval_steps_per_second': 0.581, 'epoch': 1.96}                                                                   
+{'train_runtime': 191.9715, 'train_samples_per_second': 169.348, 'train_steps_per_second': 5.313, 'train_loss': 15.874718780517577, 'epoch': 1.96}                                                                                                                                        
+ 20%|███████████████████▊                                                                                 | 200/1020 [03:11<13:07,  1.04it/s]
+
+保存最终模型...
+
+运行最终评估...
+/mnt/workspace/workgroup/qq/qq-env/whisper/lib/python3.9/site-packages/torch/nn/parallel/_functions.py:71: UserWarning: Was asked to gather along dimension 0, but all input tensors were scalars; will instead unsqueeze and return a vector.
+  warnings.warn(
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████| 23/23 [00:37<00:00,  1.63s/it]
+
+============================================================
+训练完成!
+============================================================
+最终 BLEU: 0.00
+最终 ROUGE-L: 0.00
+模型保存位置: ./exp/translation-mt5-small-260320-182507/final_model
+
+使用翻译模型:
+  from transformers import MT5ForConditionalGeneration, MT5Tokenizer
+  tokenizer = MT5Tokenizer.from_pretrained('./exp/translation-mt5-small-260320-182507/final_model')
+  model = MT5ForConditionalGeneration.from_pretrained('./exp/translation-mt5-small-260320-182507/final_model')
+  inputs = tokenizer('翻译上海话到普通话: 侬好', return_tensors='pt')
+  outputs = model.generate(**inputs)
+  print(tokenizer.decode(outputs[0], skip_special_tokens=True))

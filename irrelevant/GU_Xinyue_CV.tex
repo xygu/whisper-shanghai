@@ -1,0 +1,316 @@
+\documentclass[10pt, letterpaper]{article}
+
+% Packages:
+\usepackage[
+    ignoreheadfoot,
+    top=2 cm,
+    bottom=2 cm,
+    left=2 cm,
+    right=2 cm,
+    footskip=1.0 cm,
+]{geometry}
+\usepackage{titlesec}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage[dvipsnames]{xcolor}
+\definecolor{primaryColor}{RGB}{0, 0, 0}
+\usepackage{enumitem}
+\usepackage{fontawesome}
+\usepackage{amsmath}
+\usepackage[
+    pdftitle={Xinyue Gu's CV},
+    pdfauthor={Xinyue Gu},
+    pdfcreator={LaTeX with RenderCV},
+    colorlinks=true,
+    urlcolor=primaryColor
+]{hyperref}
+\usepackage[pscoord]{eso-pic}
+\usepackage{calc}
+\usepackage{bookmark}
+\usepackage{lastpage}
+\usepackage{changepage}
+\usepackage{paracol}
+\usepackage{ifthen}
+\usepackage{needspace}
+\usepackage{iftex}
+
+% Font and CJK support setup based on engine
+\ifXeTeX
+    \usepackage{fontspec}
+    \usepackage[UTF8]{ctex}
+    \setmainfont{XITS}
+    \usepackage{fontawesome}
+\else
+    \ifLuaTeX
+        \usepackage{fontspec}
+        \usepackage[UTF8]{ctex}
+        \setmainfont{XITS}
+        \usepackage{fontawesome}
+    \else
+        \input{glyphtounicode}
+        \pdfgentounicode=1
+        \usepackage[T1]{fontenc}
+        \usepackage[utf8]{inputenc}
+        \usepackage{lmodern}
+    \fi
+\fi
+
+% Settings
+\raggedright
+\AtBeginEnvironment{adjustwidth}{\partopsep0pt}
+\pagestyle{empty}
+\setcounter{secnumdepth}{0}
+\setlength{\parindent}{0pt}
+\setlength{\topskip}{0pt}
+\setlength{\columnsep}{0.15cm}
+\pagenumbering{gobble}
+
+\titleformat{\section}{\needspace{4\baselineskip}\bfseries\large}{}{0pt}{}[\vspace{1pt}\titlerule]
+
+\titlespacing{\section}{
+    -1pt
+}{
+    0.3 cm
+}{
+    0.2 cm
+}
+
+\renewcommand\labelitemi{$\vcenter{\hbox{\small$\bullet$}}$}
+\newenvironment{highlights}{
+    \begin{itemize}[
+        topsep=0.10 cm,
+        parsep=0.10 cm,
+        partopsep=0pt,
+        itemsep=0pt,
+        leftmargin=0 cm + 10pt
+    ]
+}{
+    \end{itemize}
+}
+
+\newenvironment{highlightsforbulletentries}{
+    \begin{itemize}[
+        topsep=0.10 cm,
+        parsep=0.10 cm,
+        partopsep=0pt,
+        itemsep=0pt,
+        leftmargin=10pt
+    ]
+}{
+    \end{itemize}
+}
+
+\newenvironment{onecolentry}{
+    \begin{adjustwidth}{
+        0 cm + 0.00001 cm
+    }{
+        0 cm + 0.00001 cm
+    }
+}{
+    \end{adjustwidth}
+}
+
+\newenvironment{twocolentry}[2][]{
+    \onecolentry
+    \def\secondColumn{#2}
+    \setcolumnwidth{\fill, 4.5 cm}
+    \begin{paracol}{2}
+}{
+    \switchcolumn \raggedleft \secondColumn
+    \end{paracol}
+    \endonecolentry
+}
+
+\newenvironment{threecolentry}[3][]{
+    \onecolentry
+    \def\thirdColumn{#3}
+    \setcolumnwidth{, \fill, 4.5 cm}
+    \begin{paracol}{3}
+    {\raggedright #2} \switchcolumn
+}{
+    \switchcolumn \raggedleft \thirdColumn
+    \end{paracol}
+    \endonecolentry
+}
+
+\newenvironment{header}{
+    \setlength{\topsep}{0pt}\par\kern\topsep\centering\linespread{1.5}
+}{
+    \par\kern\topsep
+}
+
+\newcommand{\placelastupdatedtext}{
+  \AddToShipoutPictureFG*{
+    \put(
+        \LenToUnit{\paperwidth-2 cm-0 cm+0.05cm},
+        \LenToUnit{\paperheight-1.0 cm}
+    ){\vtop{{\null}\makebox[0pt][c]{
+        \small\color{gray}\textit{Last updated in March 2026}\hspace{\widthof{Last updated in March 2026}}
+    }}}%
+  }%
+}%
+
+\let\hrefWithoutArrow\href
+
+\begin{document}
+    \newcommand{\AND}{\unskip
+        \cleaders\copy\ANDbox\hskip\wd\ANDbox
+        \ignorespaces
+    }
+    \newsavebox\ANDbox
+    \sbox\ANDbox{$|$}
+
+    \begin{header}
+        \fontsize{20 pt}{20 pt}\selectfont 顾心悦
+
+        \vspace{2 pt}
+
+        \normalsize
+        \mbox{\hrefWithoutArrow{mailto:glegexy@163.com}{\faEnvelope\ glegexy@163.com}}%
+        \kern 5.0 pt%
+        \AND%
+        \kern 5.0 pt%
+        \mbox{\faPhone\ +86 180-5823-5711}%
+    \end{header}
+
+    \vspace{0 pt}
+
+    \section{个人简介}
+    \begin{onecolentry}
+        \textbf{本职}：时序/气象大模型预训练算法工程师，专注于零样本时序建模、以视觉模型为基础的多元异构数据融合、可解释预测及高效微调。具备从数据构建到模型部署的全链路工程能力，主导千万级项目交付，开发商用级Python工具包。研究成果发表于ICML、KDD、ICLR等顶会。
+
+        \vspace{0.1cm}
+        \textbf{志趣}：语音与音乐AI。时序大模型与语音合成一脉相承——多通道时序信号的条件分布建模；气象大模型借鉴ViT、Diffusion等视觉技术，与音频生成共享架构基础。业余深耕TTS与Whisper后训练，探索方言ASR的Cascade与End-to-End架构，实践SFT/LoRA与GRPO。
+
+        \vspace{0.1cm}
+        \textbf{愿景}：语音合成应跨越文化与种族，让残障者、健全者、机器都能精准表达性格、语气、语义与角色；音乐AI应以MusicTheoryLM挖掘LLM潜能，滋养音乐的理论、创作与演奏。
+
+        \vspace{0.1cm}
+        \textbf{主页}：\href{https://github.com/xygu}{GitHub}（上海话ASR） | \href{https://www.jianshu.com/u/5f3e947bab0b}{简书}（VALL-E/Grad-TTS技术博客） | \href{https://medium.com/@glegexy}{Medium} | \href{https://www.youtube.com/@glegexy}{YouTube}（SparkTTS作品/钢琴演奏）
+    \end{onecolentry}
+
+    \section{教育背景}
+    \begin{twocolentry}{2015.08 - 2022.07}
+        \textbf{清华大学}，管理科学与工程博士 \hspace{0.5cm}\faMapMarker\ 北京
+    \end{twocolentry}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item 导师：\href{http://www.sem.tsinghua.edu.cn/zh/libo}{黎波} | 研究方向：机器学习/统计理论，不确定性环境下的决策问题
+        \end{highlights}
+    \end{onecolentry}
+
+    \begin{twocolentry}{2018.10 - 2019.05}
+        \textbf{佐治亚理工学院}，访问学者 \hspace{0.5cm}\faMapMarker\ 美国亚特兰大
+    \end{twocolentry}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item 导师：\href{https://www.enluzhou.gatech.edu/}{Enlu Zhou} | 研究方向：复杂系统与高不确定性下的模型鲁棒性
+        \end{highlights}
+    \end{onecolentry}
+
+    \begin{twocolentry}{2011.08 - 2015.07}
+        \textbf{清华大学}，经济学学士 \hspace{0.5cm}\faMapMarker\ 北京
+    \end{twocolentry}
+
+    \begin{twocolentry}{2008.09 - 2011.07}
+        \textbf{杭州外国语学校}，理科竞赛班 \hspace{0.5cm}\faMapMarker\ 浙江杭州
+    \end{twocolentry}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item 高中数学竞赛省二等奖
+        \end{highlights}
+    \end{onecolentry}
+
+    \section{工作经历}
+    \begin{twocolentry}{2022.09至今}
+        \textbf{阿里巴巴，达摩院} -- 高级算法工程师 \hspace{0.5cm}\faMapMarker\ 浙江杭州
+    \end{twocolentry}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item \textbf{多源异构气象全球模型研发}（工作论文\href{https://arxiv.org/abs/2603.14845}{https://arxiv.org/abs/2603.14845}）：
+                \begin{itemize}
+                    \item 用ViT、Swin Transformer、VAE+Diffusion等进行技术迭代，实现多源异构数据融合与表征学习；
+                    \item 设计两阶段框架解耦多变量推断，并通过可解释方法验证黑盒架构能够动态加权多源数据，缓解模态间信息冗余与不平衡问题。
+                \end{itemize}
+            \item \textbf{大模型机理分析与高效微调}：
+                \begin{itemize}
+                    \item 基于SAE与反事实推理等技术，以人类能够理解的概念形式，在隐层中定位预测失败的关键原因。算法针对关键概念激活情况实现大模型行为的自动化精准干预（工作论文https://arxiv.org/abs/2501.03229）；
+                    \item 应用LoRA高效微调技术优化1.5B基模适配，由于概念门控的设计，在不降低平均性能的前提下，提升模型在困难任务上的表现。
+                \end{itemize}
+            \item \textbf{时序预测大模型与机制研究}：
+                \begin{itemize}
+                    \item 参与0.6B参数序列模型研发，设计1T token合成数据生成机制，实现零样本时序预测能力
+                    \item 参与3D Attention、RoPE位置编码及自回归生成策略的迭代优化
+                \end{itemize}
+            \item \textbf{可解释预测与工具工程}：
+                \begin{itemize}
+                    \item 开发Python可解释AI工具包，集成自研的可编辑GAM、时序多阶分解、主流梯度、规则、排列置换等归因方法，支持黑盒模型透明化分析
+                    \item 构建AI Agent驱动的可编辑预测框架，实现模型实时吸收专家反馈
+                    \item 主导ToB项目交付，协调前后端跨团队协作，完成大型机构客户系统部署
+                \end{itemize}
+        \end{highlights}
+    \end{onecolentry}
+
+    \vspace{0.3cm}
+
+    \begin{twocolentry}{2017.12 - 2018.06}
+        \textbf{滴滴出行，AI Labs} -- 研究工程师（实习） \hspace{0.5cm}\faMapMarker\ 北京
+    \end{twocolentry}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item \textbf{因果推断与决策优化}：
+                \begin{itemize}
+                    \item 基于因果推断开发快车收益预测模型，短期预测精度提升30\%，并评估理论精度上限
+                    \item 提出同步学习最优优惠券预算与收益的决策框架，研究成果纳入博士论文
+                \end{itemize}
+        \end{highlights}
+    \end{onecolentry}
+
+    \vspace{0.3cm}
+
+    \begin{twocolentry}{2017.07 - 2017.08}
+        \textbf{万得金融终端，智能研究部} -- 研究分析师（实习） \hspace{0.5cm}\faMapMarker\ 上海
+    \end{twocolentry}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item \textbf{智能交易系统}：
+                \begin{itemize}
+                    \item 带领5人团队实现基于LSTM的自动交易系统，三年回测sharpe 3.1（牛市），超越传统交易策略及HODL
+                    \item 设计实时交易可视化监控平台，支持策略实时调优
+                \end{itemize}
+        \end{highlights}
+    \end{onecolentry}
+
+    \section{研究成果}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item \textbf{ICLR 2026} -- \href{https://openreview.net/forum?id=IbcdVwzLrp}{ProtoTS: Learning Hierarchical Prototypes for Explainable Time Series Forecasting} (with Peng Ziheng, Ren Shijie, Yang Linxiao, Wang Xiting, Sun Liang)
+            \item \textbf{ICML 2024} -- \href{https://icml.cc/virtual/2024/poster/33933}{Explain Temporal Black-Box Models via Functional Decomposition} (with Yang Linxiao, Tong Yunze, Sun Liang)
+            \item \textbf{KDD 2024} -- \href{https://arxiv.org/abs/2407.01004}{CURLS: Causal Rule Learning for Subgroups with Significant Treatment Effect} (with Zhou Jiehui, Yang Linxiao, Liu Xingyu, Sun Liang, Chen Wei)
+            \item \textbf{ASE 2024} -- \href{https://arxiv.org/abs/2405.20848}{SLIM: a Scalable Light-weight Root Cause Analysis for Imbalanced Data in Microservice} (with Ren Rui, Yang Jingbang, Yang Linxiao, Sun Liang)
+            \item \textbf{KDD 2023} -- \href{https://doi.org/10.1145/3580305.3599848}{Interactive Generalized Additive Model and Its Applications in Electric Load Forecasting} (with Yang Linxiao, Ren Rui, Sun Liang)
+        \end{highlights}
+    \end{onecolentry}
+
+    \section{技术技能}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item \textbf{语音与音频：}ASR（Whisper微调、方言识别）、TTS（Codec、Diffusion、Zero-Shot）、语音数据处理与增强；SFT/LoRA微调、GRPO强化学习
+            \item \textbf{大模型与生成：}Transformer架构、大语言模型、自回归生成、RoPE位置编码；ViT、Diffusion、VAE、Flow Matching
+            \item \textbf{深度学习框架：}PyTorch、Flash Attention、DeepSpeed、分布式训练
+            \item \textbf{编程与工程：}Python、R、C++、Linux
+            \item \textbf{语言：}普通话（母语）、吴语/上海话（母语）、英语（工作）、德语（六级）、日语（N3）、法语（B1）
+        \end{highlights}
+    \end{onecolentry}
+
+    \section{兴趣爱好}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item \textbf{羽毛球}：三届校级团体第一
+            \item \textbf{游泳}：校级蝶泳第三
+            \item \textbf{钢琴}：校艺术团成员，新电子乐队键盘手
+            \item \textbf{拳击}
+        \end{highlights}
+    \end{onecolentry}
+\end{document}
+ 

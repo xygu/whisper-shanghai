@@ -1,0 +1,116 @@
+# ASR-TACT Configuration
+# 基于 SAE 的可解释 ASR 微调框架配置
+
+# Whisper 模型配置
+whisper:
+  model_name: "openai/whisper-medium"
+  language: "zh"
+  task: "transcribe"
+
+# 数据集配置
+dataset:
+  path: "dataset/shanghai/shanghai_dataset"
+  sample_rate: 16000
+  max_duration: 30.0
+
+# SAE 配置
+sae:
+  # 输入维度 (自动从模型获取)
+  # input_dim: 1024  # whisper-medium
+  
+  # 稀疏表征维度 (神经元数量)
+  latent_dim: 8192
+  
+  # 归一化类型: z-norm, layer_norm, rms_norm
+  norm_type: "z-norm"
+  
+  # 是否使用 ReLU 激活
+  use_activate: true
+  
+  # TopK 类型: topk, batch_topk
+  topk_type: "batch_topk"
+  
+  # 保留的 top-k 激活数量
+  topk: 64
+  
+  # 是否共享编码器和解码器权重
+  share_weight: false
+  
+  # 提取隐状态的 encoder 层
+  encoder_layer: 12
+
+# SAE 训练配置
+sae_training:
+  batch_size: 4
+  num_epochs: 10
+  learning_rate: 1.0e-4
+  weight_decay: 0.01
+  warmup_steps: 500
+  save_every: 1000
+  log_every: 100
+  
+  # 损失类型: recover_loss, prediction_loss
+  loss_type: "recover_loss"
+
+# 神经元分析配置
+neuron_analysis:
+  # 分析的最大样本数
+  max_samples: 1000
+  
+  # 每个神经元保留的 top-k 样本
+  top_k_samples: 20
+  
+  # 导出的 top-n 神经元
+  top_n_neurons: 100
+  
+  # 激活阈值
+  activation_threshold: 0.0
+
+# 门控 LoRA 配置
+gated_lora:
+  # 目标模块
+  target_modules:
+    - "q_proj"
+    - "v_proj"
+    - "k_proj"
+    - "out_proj"
+    - "fc1"
+    - "fc2"
+  
+  # LoRA 秩
+  lora_rank: 8
+  
+  # LoRA 缩放因子
+  lora_alpha: 16.0
+  
+  # LoRA dropout
+  lora_dropout: 0.05
+  
+  # 门控激活阈值
+  gate_threshold: 0.5
+  
+  # 门控神经元数量
+  num_gate_neurons: 64
+
+# 门控 LoRA 训练配置
+gated_lora_training:
+  batch_size: 2
+  gradient_accumulation_steps: 4
+  num_epochs: 10
+  learning_rate: 1.0e-5
+  warmup_steps: 100
+  eval_steps: 500
+  save_steps: 500
+
+# 输出目录
+output:
+  base_dir: "./exp/asr_tact"
+  sae_dir: "sae"
+  analysis_dir: "neuron_analysis"
+  gated_lora_dir: "gated_lora"
+
+# 硬件配置
+hardware:
+  device: "cuda"
+  fp16: true
+  num_workers: 4

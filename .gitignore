@@ -12,3 +12,7 @@ thumbs.db
 pretrained_models/*
 dataset/*
 *.pt
+exp/
+wandb/
+whisper-shanghai-finetuned/
+temp/
