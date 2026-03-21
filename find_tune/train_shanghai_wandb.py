@@ -411,14 +411,24 @@ def prepare_dataset(batch, processor, keep_text_cn=False, use_text_cn_as_target=
         processor: Whisper 处理器
         keep_text_cn: 是否保留普通话文本（用于级联模式评估）
         use_text_cn_as_target: 是否使用普通话文本作为目标（e2e 模式）
+    
+    Note:
+        音频特征提取部分与 asr_tact.data_utils.prepare_audio_features 逻辑一致，
+        可通过以下方式复用（当前保持原有实现以确保稳定性）：
+        
+        from asr_tact.data_utils import prepare_audio_features
+        batch = prepare_audio_features(batch, processor)
     """
     audio = batch["audio"]
     
-    # 计算 log-Mel 频谱图特征
+    # ========== 可复用部分：音频特征提取 ==========
+    # 此部分与 asr_tact.data_utils.prepare_audio_features 逻辑一致
+    # 计算 log-Mel 频谱图特征（WhisperFeatureExtractor 默认 padding 到 30 秒）
     batch["input_features"] = processor.feature_extractor(
         audio["array"], 
         sampling_rate=audio["sampling_rate"]
     ).input_features[0]
+    # ========== 可复用部分结束 ==========
 
     # 根据模式选择目标文本
     if use_text_cn_as_target and "text_cn" in batch:

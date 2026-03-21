@@ -2,6 +2,7 @@
 SAE Training Script for Whisper ASR
 
 训练 SAE 模型，将 Whisper encoder 的隐层表征投射到高维稀疏空间
+集成 WandB 实时监控训练进度
 """
 
 import os
@@ -20,18 +21,20 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
-from transformers import (
-    WhisperProcessor,
-    WhisperForConditionalGeneration,
-    WhisperFeatureExtractor,
-)
-from datasets import load_from_disk, Audio
+# WandB 配置（必须在 import wandb 之前设置）
+os.environ['WANDB_BASE_URL'] = 'https://api.bandw.top'
 
-# 添加父目录到路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# WandB 集成
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+    print("⚠️ WandB 未安装。运行 'pip install wandb' 来启用训练监控。")
 
 from asr_tact.sae import SAE, SAEConfig
 from asr_tact.feature_extractor import ASRFeatureExtractor, SampleFeatures
+from asr_tact.data_utils import SAEDataCollator, audio_length_to_encoder_length
 
 
 def audio_length_to_encoder_length(audio_samples: int, sample_rate: int = 16000) -> int:
@@ -53,8 +56,14 @@ class SAEDataCollator:
     """
     SAE 训练的数据整理器
     
-    动态 padding 到 batch 内最长音频，并记录实际长度用于 mask
+    Whisper 要求 mel 特征长度固定为 3000（对应 30 秒音频），
+    因此所有音频都 padding 到 30 秒，并记录实际长度用于 mask
     """
+    
+    # Whisper 固定参数
+    WHISPER_SAMPLE_RATE = 16000
+    WHISPER_MAX_AUDIO_SAMPLES = 480000  # 30 秒 * 16000 Hz
+    WHISPER_ENCODER_SEQ_LEN = 1500  # 固定输出长度
     
     def __init__(self, processor: WhisperProcessor):
         self.processor = processor
@@ -65,35 +74,31 @@ class SAEDataCollator:
         audio_arrays = [f["audio"]["array"] for f in features]
         audio_lengths = [len(arr) for arr in audio_arrays]
         
-        # 使用 processor 处理音频，动态 padding 到 batch 内最长
-        max_length = max(audio_lengths)
-        
-        # Whisper 的 mel 特征需要的最小长度是 400 samples (25ms)
-        # 为了保证 encoder 输出有效，至少需要 3200 samples (0.2s)
-        max_length = max(max_length, 3200)
-        
+        # 使用 processor 处理音频，固定 padding 到 30 秒（Whisper 要求）
         batch_input_features = []
         for audio_array in audio_arrays:
+            # 截断超过 30 秒的音频
+            if len(audio_array) > self.WHISPER_MAX_AUDIO_SAMPLES:
+                audio_array = audio_array[:self.WHISPER_MAX_AUDIO_SAMPLES]
+            
             inputs = self.feature_extractor(
                 audio_array,
-                sampling_rate=16000,
+                sampling_rate=self.WHISPER_SAMPLE_RATE,
                 return_tensors="np",
-                padding="max_length",
-                max_length=max_length,
             )
             batch_input_features.append(inputs.input_features[0])
         
         # 计算每个样本在 encoder 输出中的实际长度
-        encoder_lengths = [audio_length_to_encoder_length(length) for length in audio_lengths]
-        
-        # 计算 encoder 输出的最大长度（用于创建 attention mask）
-        # Whisper encoder 输出长度 = mel_frames // 4，mel_frames = audio_samples // 160
-        max_encoder_len = audio_length_to_encoder_length(max_length)
+        encoder_lengths = [
+            min(audio_length_to_encoder_length(length), self.WHISPER_ENCODER_SEQ_LEN)
+            for length in audio_lengths
+        ]
         
         # 创建 attention mask: 1 表示有效位置，0 表示 padding
+        # Whisper encoder 固定输出 1500 帧
         attention_masks = []
         for enc_len in encoder_lengths:
-            mask = torch.zeros(max_encoder_len)
+            mask = torch.zeros(self.WHISPER_ENCODER_SEQ_LEN)
             mask[:enc_len] = 1.0
             attention_masks.append(mask)
         
@@ -172,6 +177,9 @@ def train_sae(
     device: str = "cuda",
     save_every: int = 1000,
     log_every: int = 100,
+    use_wandb: bool = True,
+    wandb_project: str = "asr-tact-sae",
+    wandb_run_name: Optional[str] = None,
 ):
     """
     训练 SAE 模型
@@ -189,6 +197,29 @@ def train_sae(
     
     # 设置 TensorBoard
     writer = SummaryWriter(os.path.join(output_dir, 'tensorboard'))
+    
+    # 初始化 WandB
+    wandb_run = None
+    if use_wandb and WANDB_AVAILABLE:
+        run_name = wandb_run_name or f"sae-layer{encoder_layer}-latent{latent_dim}-{timestamp}"
+        wandb_run = wandb.init(
+            project=wandb_project,
+            name=run_name,
+            config={
+                "model_name": model_name,
+                "encoder_layer": encoder_layer,
+                "latent_dim": latent_dim,
+                "topk": topk,
+                "norm_type": norm_type,
+                "batch_size": batch_size,
+                "num_epochs": num_epochs,
+                "learning_rate": learning_rate,
+            },
+            dir=output_dir,
+        )
+        logger.info(f"WandB 初始化成功: {wandb_run.url}")
+    elif use_wandb and not WANDB_AVAILABLE:
+        logger.warning("WandB 不可用，将仅使用 TensorBoard 记录")
     
     # 加载 Whisper 模型
     logger.info(f"Loading Whisper model: {model_name}")
@@ -343,12 +374,25 @@ def train_sae(
             
             # 日志记录
             if global_step % log_every == 0:
+                # TensorBoard
                 writer.add_scalar('loss/total', loss.item(), global_step)
                 writer.add_scalar('loss/recover', loss_dict['recover_loss'], global_step)
                 writer.add_scalar('loss/aux', loss_dict['aux_loss'], global_step)
                 writer.add_scalar('metric/explained_var', loss_dict['explained_var'], global_step)
                 writer.add_scalar('metric/dead_neurons', loss_dict['dead_neurons'], global_step)
                 writer.add_scalar('lr', scheduler.get_last_lr()[0], global_step)
+                
+                # WandB
+                if wandb_run is not None:
+                    wandb.log({
+                        'loss/total': loss.item(),
+                        'loss/recover': loss_dict['recover_loss'],
+                        'loss/aux': loss_dict['aux_loss'],
+                        'metric/explained_var': loss_dict['explained_var'],
+                        'metric/dead_neurons': loss_dict['dead_neurons'],
+                        'lr': scheduler.get_last_lr()[0],
+                        'step': global_step,
+                    })
             
             # 保存检查点
             if global_step % save_every == 0:
@@ -369,6 +413,15 @@ def train_sae(
         avg_aux = epoch_aux_loss / len(train_loader)
         
         logger.info(f"Epoch {epoch+1}/{num_epochs} - Loss: {avg_loss:.4f}, Recover: {avg_recover:.4f}, Aux: {avg_aux:.4f}")
+        
+        # WandB epoch 级别记录
+        if wandb_run is not None:
+            wandb.log({
+                'epoch': epoch + 1,
+                'epoch/avg_loss': avg_loss,
+                'epoch/avg_recover_loss': avg_recover,
+                'epoch/avg_aux_loss': avg_aux,
+            })
         
         # 保存最佳模型
         if avg_loss < best_loss:
@@ -395,6 +448,12 @@ def train_sae(
     logger.info(f"Saved final model: {final_path}")
     
     writer.close()
+    
+    # 关闭 WandB
+    if wandb_run is not None:
+        wandb.finish()
+        logger.info("WandB 运行已完成")
+    
     logger.info("Training completed!")
     logger.info(f"Output directory: {output_dir}")
 
@@ -428,8 +487,19 @@ def main():
                         help="Save checkpoint every N steps")
     parser.add_argument("--log_every", type=int, default=100,
                         help="Log every N steps")
+    parser.add_argument("--use_wandb", action="store_true", default=True,
+                        help="Enable WandB logging")
+    parser.add_argument("--no_wandb", action="store_true",
+                        help="Disable WandB logging")
+    parser.add_argument("--wandb_project", type=str, default="asr-tact-sae",
+                        help="WandB project name")
+    parser.add_argument("--wandb_run_name", type=str, default=None,
+                        help="WandB run name (auto-generated if not provided)")
     
     args = parser.parse_args()
+    
+    # 处理 wandb 开关
+    use_wandb = args.use_wandb and not args.no_wandb
     
     train_sae(
         model_name=args.model_name,
@@ -445,6 +515,9 @@ def main():
         device=args.device,
         save_every=args.save_every,
         log_every=args.log_every,
+        use_wandb=use_wandb,
+        wandb_project=args.wandb_project,
+        wandb_run_name=args.wandb_run_name,
     )
 
 
