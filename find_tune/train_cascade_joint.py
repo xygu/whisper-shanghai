@@ -113,6 +113,16 @@ class CascadeJointModel(nn.Module):
         self.config = whisper_model.config
         self.generation_config = whisper_model.generation_config
         
+        # 添加 device 属性，用于 Trainer 兼容性
+        self._device = None
+    
+    @property
+    def device(self):
+        """返回模型所在的设备"""
+        if self._device is not None:
+            return self._device
+        return next(self.parameters()).device
+        
     def forward(
         self,
         input_features: torch.Tensor = None,
@@ -361,6 +371,27 @@ class CascadeJointTrainer(Seq2SeqTrainer):
         self.log_level = log_level.lower()
         self.debug_mode = self.log_level == "debug"
     
+    def _save(self, output_dir: str = None, state_dict=None):
+        """重写保存方法，支持自定义 CascadeJointModel 的保存"""
+        output_dir = output_dir if output_dir is not None else self.args.output_dir
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 获取实际模型（处理 DDP 包装）
+        model = self.model
+        if hasattr(model, 'module'):
+            model = model.module
+        
+        # 使用自定义的 save_pretrained 方法
+        if hasattr(model, 'save_pretrained'):
+            model.save_pretrained(output_dir)
+        else:
+            # 回退到默认保存
+            super()._save(output_dir, state_dict)
+        
+        # 保存训练参数
+        if self.args.should_save:
+            torch.save(self.args, os.path.join(output_dir, "training_args.bin"))
+    
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         """计算 loss，并记录各部分 loss，检测 NaN"""
         self.step_count += 1
@@ -499,15 +530,44 @@ class CascadeJointTrainer(Seq2SeqTrainer):
             logs: 日志字典
             start_time: 开始时间（新版本 transformers 需要此参数）
         """
+        # 使用最近一个 logging_steps 窗口内的平均值（默认 25 步）
+        window_size = self.args.logging_steps if hasattr(self.args, 'logging_steps') else 25
         if self.asr_loss_history:
-            logs["asr_loss"] = np.mean(self.asr_loss_history[-100:])
+            logs["asr_loss"] = np.mean(self.asr_loss_history[-window_size:])
         if self.translation_loss_history:
-            logs["translation_loss"] = np.mean(self.translation_loss_history[-100:])
+            logs["translation_loss"] = np.mean(self.translation_loss_history[-window_size:])
         # 兼容新旧版本 transformers
         if start_time is not None:
             super().log(logs, start_time)
         else:
             super().log(logs)
+    
+    def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix="eval"):
+        """重写评估方法，添加详细日志"""
+        print(f"\n{'='*70}")
+        print(f"🔍 开始评估 (Step {self.state.global_step})...")
+        print(f"{'='*70}")
+        
+        try:
+            # 调用父类评估
+            metrics = super().evaluate(eval_dataset, ignore_keys, metric_key_prefix)
+            
+            print(f"\n{'='*70}")
+            print(f"✓ 评估完成 (Step {self.state.global_step})")
+            print(f"  评估指标: {metrics}")
+            print(f"{'='*70}\n")
+            
+            return metrics
+        except Exception as e:
+            print(f"\n{'='*70}")
+            print(f"❌ 评估失败 (Step {self.state.global_step})")
+            print(f"  错误类型: {type(e).__name__}")
+            print(f"  错误信息: {str(e)}")
+            import traceback
+            print(f"  堆栈跟踪:")
+            traceback.print_exc()
+            print(f"{'='*70}\n")
+            raise
 
 
 class LossLoggingCallback(TrainerCallback):
@@ -604,6 +664,14 @@ def compute_metrics(pred, processor, metric):
     # 替换 -100
     label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
     
+    # 清理预测 ID：替换无效值（负数或超出词汇表范围）
+    vocab_size = processor.tokenizer.vocab_size
+    pred_ids = np.where(
+        (pred_ids >= 0) & (pred_ids < vocab_size),
+        pred_ids,
+        processor.tokenizer.pad_token_id
+    )
+    
     # 解码
     pred_str = processor.tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
     label_str = processor.tokenizer.batch_decode(label_ids, skip_special_tokens=True)
@@ -645,9 +713,9 @@ def main():
                         help="梯度累积步数（配合小 batch size 使用）")
     parser.add_argument("--warmup_steps", type=int, default=250,
                         help="预热步数")
-    parser.add_argument("--eval_steps", type=int, default=250,
+    parser.add_argument("--eval_steps", type=int, default=50,
                         help="评估间隔")
-    parser.add_argument("--save_steps", type=int, default=250,
+    parser.add_argument("--save_steps", type=int, default=50,
                         help="保存间隔")
     
     # LoRA 配置

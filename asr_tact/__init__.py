@@ -14,7 +14,7 @@ ASR-TACT: Targeted Activation Concept Tuning for ASR
 from .sae import SAE
 from .feature_extractor import ASRFeatureExtractor
 from .neuron_analyzer import NeuronAnalyzer
-from .gated_lora import GatedLoRA
+from .gated_lora import GatedLoRAModel, GatedLoRAConfig, GatedLoRALinear
 
 __version__ = "0.1.0"
-__all__ = ["SAE", "ASRFeatureExtractor", "NeuronAnalyzer", "GatedLoRA"]
+__all__ = ["SAE", "ASRFeatureExtractor", "NeuronAnalyzer", "GatedLoRAModel", "GatedLoRAConfig", "GatedLoRALinear"]
