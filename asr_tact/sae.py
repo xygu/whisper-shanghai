@@ -235,37 +235,72 @@ class SAE(nn.Module):
         self, 
         x: torch.Tensor, 
         sparse_recover: torch.Tensor, 
-        aux_recover: torch.Tensor
+        aux_recover: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, dict]:
         """
         计算 SAE 损失
         
         Args:
-            x: 原始输入
-            sparse_recover: 稀疏重建
-            aux_recover: 辅助重建
+            x: 原始输入 [batch, seq_len, input_dim]
+            sparse_recover: 稀疏重建 [batch, seq_len, input_dim]
+            aux_recover: 辅助重建 [batch, seq_len, input_dim]
+            attention_mask: 注意力掩码 [batch, seq_len]，1 表示有效位置，0 表示 padding
             
         Returns:
             total_loss: 总损失
             loss_dict: 各项损失详情
         """
-        # 重建损失
-        recover_loss = F.mse_loss(sparse_recover, x)
-        
-        # 辅助损失 (激活死神经元)
-        aux_loss = F.mse_loss(x - sparse_recover.detach(), aux_recover)
+        if attention_mask is not None:
+            # 扩展 mask 到 [batch, seq_len, 1] 用于广播
+            mask = attention_mask.unsqueeze(-1)  # [batch, seq_len, 1]
+            
+            # 计算有效位置数量
+            num_valid = mask.sum()
+            
+            if num_valid > 0:
+                # 重建损失：只计算有效位置
+                recover_diff = (sparse_recover - x) ** 2  # [batch, seq_len, input_dim]
+                recover_loss = (recover_diff * mask).sum() / (num_valid * x.shape[-1])
+                
+                # 辅助损失：只计算有效位置
+                aux_diff = (aux_recover - (x - sparse_recover.detach())) ** 2
+                aux_loss = (aux_diff * mask).sum() / (num_valid * x.shape[-1])
+                
+                # 计算解释方差：只在有效位置
+                x_masked = x * mask
+                recover_masked = sparse_recover * mask
+                
+                # 计算每个样本的方差（只考虑有效位置）
+                valid_counts = mask.sum(dim=1, keepdim=True).clamp(min=1)  # [batch, 1, 1]
+                
+                x_mean = (x_masked.sum(dim=1, keepdim=True) / valid_counts)
+                x_var = ((x_masked - x_mean * mask) ** 2 * mask).sum(dim=1) / valid_counts.squeeze(1).clamp(min=1)
+                
+                diff_masked = (x - sparse_recover) * mask
+                diff_mean = (diff_masked.sum(dim=1, keepdim=True) / valid_counts)
+                diff_var = ((diff_masked - diff_mean * mask) ** 2 * mask).sum(dim=1) / valid_counts.squeeze(1).clamp(min=1)
+                
+                explained_var = (1 - (diff_var / (x_var + 1e-6))).mean()
+            else:
+                # 没有有效位置，返回零损失
+                recover_loss = torch.tensor(0.0, device=x.device)
+                aux_loss = torch.tensor(0.0, device=x.device)
+                explained_var = torch.tensor(0.0, device=x.device)
+        else:
+            # 无 mask，使用原始计算方式
+            recover_loss = F.mse_loss(sparse_recover, x)
+            aux_loss = F.mse_loss(x - sparse_recover.detach(), aux_recover)
+            explained_var = 1 - ((x - sparse_recover).var(dim=-2) / (x.var(dim=-2) + 1e-6)).mean()
         
         # 总损失
         total_loss = recover_loss + self.scaler * aux_loss
         
-        # 计算解释方差
-        explained_var = 1 - ((x - sparse_recover).var(dim=-2) / (x.var(dim=-2) + 1e-6)).mean()
-        
         loss_dict = {
-            'recover_loss': recover_loss.item(),
-            'aux_loss': aux_loss.item(),
+            'recover_loss': recover_loss.item() if isinstance(recover_loss, torch.Tensor) else recover_loss,
+            'aux_loss': aux_loss.item() if isinstance(aux_loss, torch.Tensor) else aux_loss,
             'total_loss': total_loss.item(),
-            'explained_var': explained_var.item(),
+            'explained_var': explained_var.item() if isinstance(explained_var, torch.Tensor) else explained_var,
             'dead_neurons': (self.use_number > 1e6).sum().item(),
         }
         

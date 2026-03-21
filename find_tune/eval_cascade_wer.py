@@ -56,7 +56,7 @@ def main():
     parser.add_argument("--whisper_model", type=str, required=True, help="Whisper ASR 模型路径")
     parser.add_argument("--translation_model", type=str, required=True, help="MT5 翻译模型路径")
     parser.add_argument("--dataset_path", type=str, 
-                        default="/mnt/workspace/workgroup/qq/ts/whisper/dataset/shanghai/shanghai_dataset",
+                        default="/mnt/workspace/workgroup/qq/ts/whisper/dataset/shanghai/shanghai_unified_dataset",
                         help="数据集路径")
     parser.add_argument("--output_dir", type=str, default=None, help="输出目录（默认为 whisper_model 目录）")
     parser.add_argument("--device", type=str, default=None, help="设备 (cuda/cpu)")

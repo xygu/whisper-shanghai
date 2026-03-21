@@ -25,8 +25,8 @@ def load_data(root_dir = "dataset/shanghai/", jsonl_dir = 'shanghai_hf_data.json
             return item
         ds = DatasetDict()
         # 5. 应用到数据集（推荐dataloader时按需加载时再处理，若数据量不大也可提前map）
-        ds['train'] = train_ds.map(process_audio, num_proc=4)
-        ds['test']  = test_ds.map(process_audio, num_proc=4)
+        ds['train'] = train_ds.map(process_audio, num_proc=1)
+        ds['test']  = test_ds.map(process_audio, num_proc=1)
 
         ds.save_to_disk(os.path.join(root_dir, out_dir))
         print(f'train and test data saved to {os.path.join(root_dir, out_dir)}')

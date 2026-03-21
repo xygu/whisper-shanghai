@@ -92,7 +92,7 @@ def compute_metrics(pred, processor, metric):
 def main():
     # ==================== 配置参数 ====================
     # 数据集配置
-    dataset_path = "dataset/shanghai/shanghai_dataset"  # 预处理后的数据集路径
+    dataset_path = "dataset/shanghai/shanghai_unified_dataset"  # 统一数据集
     
     # 模型配置
     model_name = "openai/whisper-small"  # 可选: tiny, base, small, medium, large
@@ -164,7 +164,7 @@ def main():
     dataset = dataset.map(
         lambda batch: prepare_dataset(batch, processor),
         remove_columns=dataset["train"].column_names,
-        num_proc=4
+        num_proc=1
     )
     
     # ==================== 初始化数据整理器 ====================

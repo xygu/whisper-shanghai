@@ -16,7 +16,7 @@ echo "任务：上海话语音 -> 上海话文本 (LoRA)"
 echo "=============================================="
 
 # 确保数据集已准备好
-if [ ! -d "dataset/shanghai/shanghai_dataset" ]; then
+if [ ! -d "dataset/shanghai/shanghai_unified_dataset" ]; then
     echo "[Step 1] 准备级联数据集..."
     python find_tune/make_data_shanghai.py
     python find_tune/load_data_shanghai.py

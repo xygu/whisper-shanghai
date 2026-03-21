@@ -328,8 +328,8 @@ def get_optimal_settings(hardware_config: dict, model_size: str) -> Tuple[int, i
     cpu_count = hardware_config["cpu_count"]
     gpu_count = hardware_config["gpu_count"]
     
-    # 限制最大进程数为 4，避免多进程 map 时发生死锁
-    num_proc = max(1, min(cpu_count * 3 // 4, 4))
+    # 固定为单线程预处理，更稳定
+    num_proc = 1
     dataloader_num_workers = max(2, min(cpu_count // 4, 8))
     
     # 根据模型大小设置默认的 batch_size（经过实测验证的保守值）
@@ -402,7 +402,7 @@ class DataCollatorSpeechSeq2SeqWithPadding:
         batch["labels"] = labels
         return batch
 
-def prepare_dataset(batch, processor, keep_text_cn=False):
+def prepare_dataset(batch, processor, keep_text_cn=False, use_text_cn_as_target=False):
     """
     准备数据集：提取音频特征并对文本进行分词
     
@@ -410,6 +410,7 @@ def prepare_dataset(batch, processor, keep_text_cn=False):
         batch: 数据批次
         processor: Whisper 处理器
         keep_text_cn: 是否保留普通话文本（用于级联模式评估）
+        use_text_cn_as_target: 是否使用普通话文本作为目标（e2e 模式）
     """
     audio = batch["audio"]
     
@@ -419,8 +420,15 @@ def prepare_dataset(batch, processor, keep_text_cn=False):
         sampling_rate=audio["sampling_rate"]
     ).input_features[0]
 
-    # 对文本进行编码（上海话文本作为训练标签）
-    batch["labels"] = processor.tokenizer(batch["text"]).input_ids
+    # 根据模式选择目标文本
+    if use_text_cn_as_target and "text_cn" in batch:
+        # e2e 模式：使用普通话文本作为目标
+        target_text = batch["text_cn"]
+    else:
+        # cascade 模式：使用上海话文本作为目标
+        target_text = batch["text"]
+    
+    batch["labels"] = processor.tokenizer(target_text).input_ids
     
     # 保留普通话文本用于评估（如果存在）
     if keep_text_cn and "text_cn" in batch:
@@ -614,9 +622,9 @@ def main():
     
     # 数据集路径（端到端和级联使用不同的数据集，但同一个 WandB 项目）
     if is_e2e:
-        dataset_path = "dataset/shanghai/shanghai_e2e_dataset"
+        dataset_path = "dataset/shanghai/shanghai_unified_dataset"
     else:
-        dataset_path = "dataset/shanghai/shanghai_dataset"
+        dataset_path = "dataset/shanghai/shanghai_unified_dataset"
     
     # 统一的 WandB 项目，用 mode 分组区分
     wandb_project = "whisper-shanghai-finetuning"
@@ -791,9 +799,10 @@ def main():
     logger.info("✓ 处理器加载完成")
     
     # ==================== 准备数据集（在加载模型之前，避免多进程与 CUDA/LoRA 冲突）====================
-    # 预处理缓存路径：所有 Whisper 模型共享相同的 Mel 特征和 tokenizer，所以缓存与 model_size 无关
-    # 级联模式使用不同的缓存目录（因为需要保留 text_cn）
-    cache_suffix = "_with_cn" if (not is_e2e and "text_cn" in dataset["train"].column_names) else ""
+    # 预处理缓存路径：e2e 和 cascade 使用不同的目标文本，需要不同的缓存
+    # - cascade: 目标是上海话文本 (text)，缓存后缀 _cascade
+    # - e2e: 目标是普通话文本 (text_cn)，缓存后缀 _e2e
+    cache_suffix = "_e2e" if is_e2e else "_cascade"
     cache_dir = os.path.join(dataset_path, f"preprocessed{cache_suffix}")
     
     # 检查数据集是否包含普通话文本（用于级联模式最终评估）
@@ -822,7 +831,7 @@ def main():
         
         dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
         dataset = dataset.map(
-            lambda batch: prepare_dataset(batch, processor, keep_text_cn=keep_text_cn),
+            lambda batch: prepare_dataset(batch, processor, keep_text_cn=keep_text_cn, use_text_cn_as_target=is_e2e),
             remove_columns=columns_to_remove,
             num_proc=num_proc
         )

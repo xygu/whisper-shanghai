@@ -46,7 +46,7 @@ def main():
     parser.add_argument(
         "--dataset_path",
         type=str,
-        default="dataset/shanghai/shanghai_dataset",
+        default="dataset/shanghai/shanghai_unified_dataset",
         help="数据集路径"
     )
     parser.add_argument(

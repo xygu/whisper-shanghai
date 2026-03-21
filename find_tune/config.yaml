@@ -1,0 +1,72 @@
+# 上海方言微调统一配置文件
+# 所有训练脚本都从这里读取配置，修改只需改这个文件
+
+# ==================== 数据集配置 ====================
+dataset:
+  root_dir: "dataset/shanghai/"
+  
+  # 统一数据集（cascade 和 e2e 共用，确保相同的 train/test 划分）
+  unified_dataset: "shanghai_unified_dataset"
+  unified_jsonl: "shanghai_unified_data.jsonl"
+  
+  # 数据划分配置（固定，确保可复现）
+  seed: 42
+  test_size: 0.2
+  
+  # 预处理配置
+  preprocessing:
+    num_proc: 1  # 预处理进程数，1 表示单线程（更稳定）
+    sampling_rate: 16000
+
+# ==================== 模型配置 ====================
+models:
+  # Whisper 模型
+  whisper:
+    small: "openai/whisper-small"
+    medium: "openai/whisper-medium"
+    large: "openai/whisper-large-v3"
+  
+  # 翻译模型（预训练好的）
+  translation: "/mnt/workspace/workgroup/qq/ts/whisper/exp/translation-mt5-small-260320-231422/final_model"
+
+# ==================== 训练配置 ====================
+training:
+  # 通用配置
+  learning_rate: 1e-5
+  num_train_epochs: 30
+  warmup_steps: 500
+  eval_steps: 500
+  save_steps: 500
+  batch_size: 2
+  gradient_accumulation_steps: 4
+  
+  # 数据加载
+  dataloader_num_workers: 4
+  
+  # 混合精度
+  fp16: true
+  gradient_checkpointing: true
+
+# ==================== LoRA 配置 ====================
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.1
+  target_modules:
+    - "q_proj"
+    - "v_proj"
+    - "k_proj"
+    - "o_proj"
+    - "fc1"
+    - "fc2"
+
+# ==================== 级联联合训练配置 ====================
+cascade_joint:
+  asr_loss_weight: 0.5  # ASR loss 权重，翻译 loss 权重为 1 - α
+  freeze_translation: false
+  translation_lr_scale: 0.1
+
+# ==================== WandB 配置 ====================
+wandb:
+  project: "whisper-shanghai-finetuning"
+  enabled: true

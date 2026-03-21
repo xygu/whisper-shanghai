@@ -10,7 +10,7 @@ import json
 import argparse
 import logging
 from datetime import datetime
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from tqdm import tqdm
 
 import torch
@@ -18,6 +18,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+import numpy as np
 
 from transformers import (
     WhisperProcessor,
@@ -31,6 +32,76 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from asr_tact.sae import SAE, SAEConfig
 from asr_tact.feature_extractor import ASRFeatureExtractor, SampleFeatures
+
+
+def audio_length_to_encoder_length(audio_samples: int, sample_rate: int = 16000) -> int:
+    """
+    计算音频样本数对应的 Whisper encoder 输出序列长度
+    
+    Whisper 的 mel 特征: hop_length=160, 所以 mel_frames = audio_samples // 160
+    Encoder 使用两层 stride=2 的卷积，所以 encoder_len = mel_frames // 4
+    最终: encoder_len = audio_samples // 160 // 4 = audio_samples // 640
+    但 Whisper 固定输出 1500 帧（对应 30 秒音频），短音频会被 padding
+    """
+    mel_frames = audio_samples // 160
+    encoder_len = (mel_frames + 1) // 2  # 第一层卷积 stride=2
+    encoder_len = (encoder_len + 1) // 2  # 第二层卷积 stride=2
+    return encoder_len
+
+
+class SAEDataCollator:
+    """
+    SAE 训练的数据整理器
+    
+    动态 padding 到 batch 内最长音频，并记录实际长度用于 mask
+    """
+    
+    def __init__(self, processor: WhisperProcessor):
+        self.processor = processor
+        self.feature_extractor = processor.feature_extractor
+    
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
+        # 获取所有音频数组
+        audio_arrays = [f["audio"]["array"] for f in features]
+        audio_lengths = [len(arr) for arr in audio_arrays]
+        
+        # 使用 processor 处理音频，动态 padding 到 batch 内最长
+        max_length = max(audio_lengths)
+        
+        # Whisper 的 mel 特征需要的最小长度是 400 samples (25ms)
+        # 为了保证 encoder 输出有效，至少需要 3200 samples (0.2s)
+        max_length = max(max_length, 3200)
+        
+        batch_input_features = []
+        for audio_array in audio_arrays:
+            inputs = self.feature_extractor(
+                audio_array,
+                sampling_rate=16000,
+                return_tensors="np",
+                padding="max_length",
+                max_length=max_length,
+            )
+            batch_input_features.append(inputs.input_features[0])
+        
+        # 计算每个样本在 encoder 输出中的实际长度
+        encoder_lengths = [audio_length_to_encoder_length(length) for length in audio_lengths]
+        
+        # 计算 encoder 输出的最大长度（用于创建 attention mask）
+        # Whisper encoder 输出长度 = mel_frames // 4，mel_frames = audio_samples // 160
+        max_encoder_len = audio_length_to_encoder_length(max_length)
+        
+        # 创建 attention mask: 1 表示有效位置，0 表示 padding
+        attention_masks = []
+        for enc_len in encoder_lengths:
+            mask = torch.zeros(max_encoder_len)
+            mask[:enc_len] = 1.0
+            attention_masks.append(mask)
+        
+        return {
+            "input_features": torch.tensor(np.stack(batch_input_features), dtype=torch.float32),
+            "attention_mask": torch.stack(attention_masks),
+            "encoder_lengths": torch.tensor(encoder_lengths, dtype=torch.long),
+        }
 
 
 def setup_logging(output_dir: str) -> logging.Logger:
@@ -172,32 +243,20 @@ def train_sae(
     logger.info(f"Train samples: {len(dataset['train'])}")
     logger.info(f"Test samples: {len(dataset['test'])}")
     
-    # 数据预处理函数
-    def preprocess_batch(batch):
-        audio_arrays = [item["array"] for item in batch["audio"]]
-        inputs = processor(
-            audio_arrays,
-            sampling_rate=16000,
-            return_tensors="pt",
-            padding=True,
-        )
-        return {"input_features": inputs.input_features}
+    # 创建数据整理器（动态 padding + mask）
+    data_collator = SAEDataCollator(processor)
     
     # 创建 DataLoader
-    train_dataset = dataset["train"].map(
-        preprocess_batch,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=dataset["train"].column_names,
-    )
-    train_dataset.set_format(type="torch", columns=["input_features"])
+    # 保留 audio 列用于 collator 处理
+    train_dataset = dataset["train"]
     
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=4,
+        num_workers=0,  # 使用 0 避免多进程序列化问题
         pin_memory=True,
+        collate_fn=data_collator,
     )
     
     # 优化器
@@ -236,17 +295,31 @@ def train_sae(
         
         for batch_idx, batch in enumerate(progress_bar):
             input_features = batch["input_features"].to(device)
+            attention_mask = batch["attention_mask"].to(device)  # [batch, encoder_seq_len]
             
             # 提取 encoder 隐状态
             hidden_states = extract_encoder_hidden_states(
                 whisper_model, input_features, layer=encoder_layer
             )
             
+            # 调整 attention_mask 以匹配 hidden_states 的实际长度
+            # Whisper encoder 输出固定为 1500 帧（对应 30 秒音频）
+            actual_seq_len = hidden_states.shape[1]
+            if attention_mask.shape[1] < actual_seq_len:
+                # 如果 mask 比 hidden_states 短，扩展 mask（padding 部分为 0）
+                pad_len = actual_seq_len - attention_mask.shape[1]
+                attention_mask = F.pad(attention_mask, (0, pad_len), value=0.0)
+            elif attention_mask.shape[1] > actual_seq_len:
+                # 如果 mask 比 hidden_states 长，截断
+                attention_mask = attention_mask[:, :actual_seq_len]
+            
             # SAE 前向传播
             sparse_recover, aux_recover, sparse = sae(hidden_states, topk)
             
-            # 计算损失
-            loss, loss_dict = sae.compute_loss(hidden_states, sparse_recover, aux_recover)
+            # 计算损失（带 mask）
+            loss, loss_dict = sae.compute_loss(
+                hidden_states, sparse_recover, aux_recover, attention_mask
+            )
             
             # 反向传播
             optimizer.zero_grad()

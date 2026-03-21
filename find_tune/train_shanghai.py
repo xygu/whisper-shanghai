@@ -240,7 +240,7 @@ def main():
     print("\n✓ 已配置 HuggingFace 镜像: https://hf-mirror.com")
     
     # ==================== 配置参数 ====================
-    dataset_path = "dataset/shanghai/shanghai_dataset"
+    dataset_path = "dataset/shanghai/shanghai_unified_dataset"  # 统一数据集
     model_name = f"openai/whisper-{args.model_size}"
     language = "Chinese"
     task = "transcribe"
@@ -333,7 +333,7 @@ def main():
     dataset = dataset.map(
         lambda batch: prepare_dataset(batch, processor),
         remove_columns=dataset["train"].column_names,
-        num_proc=4
+        num_proc=1
     )
     
     print("✓ 数据预处理完成")

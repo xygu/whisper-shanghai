@@ -85,8 +85,8 @@ def load_shanghai_data(
         # 5. 应用音频处理
         print('Processing audio files...')
         ds = DatasetDict()
-        ds['train'] = train_ds.map(process_audio, num_proc=4)
-        ds['test'] = test_ds.map(process_audio, num_proc=4)
+        ds['train'] = train_ds.map(process_audio, num_proc=1)
+        ds['test'] = test_ds.map(process_audio, num_proc=1)
         
         # 6. 保存到磁盘
         ds.save_to_disk(out_path)

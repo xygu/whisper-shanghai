@@ -536,6 +536,17 @@ class CascadeJointTrainer(Seq2SeqTrainer):
             logs["asr_loss"] = np.mean(self.asr_loss_history[-window_size:])
         if self.translation_loss_history:
             logs["translation_loss"] = np.mean(self.translation_loss_history[-window_size:])
+        
+        # 重新计算 total_loss 以确保 Total = α * ASR + (1-α) * Trans
+        # 获取模型的 asr_loss_weight（处理 DDP 包装）
+        model = self.model
+        if hasattr(model, 'module'):
+            model = model.module
+        asr_weight = getattr(model, 'asr_loss_weight', 0.5)
+        
+        if "asr_loss" in logs and "translation_loss" in logs:
+            logs["loss"] = asr_weight * logs["asr_loss"] + (1 - asr_weight) * logs["translation_loss"]
+        
         # 兼容新旧版本 transformers
         if start_time is not None:
             super().log(logs, start_time)
@@ -582,10 +593,10 @@ class LossLoggingCallback(TrainerCallback):
             trans_loss = logs.get("translation_loss", "N/A")
             total_loss = logs.get("loss", "N/A")
             
-            if isinstance(asr_loss, float) and isinstance(trans_loss, float):
+            if isinstance(asr_loss, (int, float)) and isinstance(trans_loss, (int, float)) and isinstance(total_loss, (int, float)):
                 self.logger.info(
                     f"Step {state.global_step}: "
-                    f"Total={total_loss:.4f}, ASR={asr_loss:.4f}, Trans={trans_loss:.4f}"
+                    f"Total={float(total_loss):.4f}, ASR={float(asr_loss):.4f}, Trans={float(trans_loss):.4f}"
                 )
 
 
@@ -695,8 +706,8 @@ def main():
                         default="/mnt/workspace/workgroup/qq/ts/whisper/exp/translation-mt5-small-260320-231422/final_model",
                         help="翻译模型路径（预训练好的 mT5）")
     parser.add_argument("--dataset_path", type=str,
-                        default="dataset/shanghai/shanghai_dataset",
-                        help="数据集路径")
+                        default="dataset/shanghai/shanghai_unified_dataset",
+                        help="数据集路径（统一数据集，确保所有训练方式使用相同划分）")
     parser.add_argument("--output_dir", type=str, default=None,
                         help="输出目录")
     
@@ -713,9 +724,9 @@ def main():
                         help="梯度累积步数（配合小 batch size 使用）")
     parser.add_argument("--warmup_steps", type=int, default=250,
                         help="预热步数")
-    parser.add_argument("--eval_steps", type=int, default=50,
+    parser.add_argument("--eval_steps", type=int, default=250,
                         help="评估间隔")
-    parser.add_argument("--save_steps", type=int, default=50,
+    parser.add_argument("--save_steps", type=int, default=250,
                         help="保存间隔")
     
     # LoRA 配置
@@ -739,8 +750,8 @@ def main():
                         help="使用 FP16 训练")
     parser.add_argument("--gradient_checkpointing", action="store_true", default=False,
                         help="使用梯度检查点（节省显存，默认启用）")
-    parser.add_argument("--num_proc", type=int, default=4,
-                        help="数据预处理进程数")
+    parser.add_argument("--num_proc", type=int, default=1,
+                        help="数据预处理进程数（默认单线程，更稳定）")
     parser.add_argument("--log_level", type=str, default="info",
                         choices=["debug", "info", "warning", "error"],
                         help="日志级别：debug 显示详细调试信息，info 为默认级别")

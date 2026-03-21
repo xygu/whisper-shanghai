@@ -11,7 +11,7 @@ echo "任务：上海话语音 -> 上海话文本 -> 普通话文本"
 echo "=============================================="
 
 # 检查数据集
-if [ ! -d "dataset/shanghai/shanghai_dataset" ]; then
+if [ ! -d "dataset/shanghai/shanghai_unified_dataset" ]; then
     echo ""
     echo "[Step 1] 准备数据集..."
     python find_tune/make_data_shanghai.py

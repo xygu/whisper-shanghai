@@ -11,16 +11,8 @@ import multiprocessing
 
 
 def get_optimal_num_proc() -> int:
-    """
-    根据 CPU 核心数自动计算最优的并行进程数
-    
-    Returns:
-        int: 推荐的进程数
-    """
-    cpu_count = multiprocessing.cpu_count()
-    # 使用 CPU 核心数的 75%，避免过载，最少 1 个，最多 16 个
-    num_proc = max(1, min(cpu_count * 3 // 4, 16))
-    return num_proc
+    """返回预处理进程数（固定为1，单线程更稳定）"""
+    return 1
 
 def load_shanghai_e2e_data(
     root_dir="dataset/shanghai/",

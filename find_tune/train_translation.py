@@ -424,7 +424,7 @@ def main():
         ),
         batched=True,
         remove_columns=dataset["train"].column_names,
-        num_proc=4,
+        num_proc=1,
     )
     
     logger.info("✓ 数据预处理完成")
