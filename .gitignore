@@ -16,3 +16,4 @@ exp/
 wandb/
 whisper-shanghai-finetuned/
 temp/
+*.out

@@ -243,7 +243,14 @@ class CascadeJointModel(nn.Module):
     
     def generate(self, input_features, **kwargs):
         """生成函数，用于评估时的 ASR 推理"""
-        return self.whisper.generate(input_features=input_features, **kwargs)
+        # 过滤掉翻译相关的参数，这些参数 Whisper 模型不认识
+        translation_keys = [
+            'translation_input_ids', 
+            'translation_attention_mask', 
+            'translation_labels'
+        ]
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k not in translation_keys}
+        return self.whisper.generate(input_features=input_features, **filtered_kwargs)
     
     def gradient_checkpointing_enable(self, **kwargs):
         """启用梯度检查点"""

@@ -1,126 +1,0 @@
-======================================================================
-级联联合训练：Whisper ASR + mT5 翻译
-======================================================================
-任务：上海话语音 -> 上海话文本 -> 普通话文本
-Loss = 0.50 * ASR + 0.50 * Translation
-日志文件: ./exp/cascade-joint-full-260322-010015/training_20260322_010015.log
-设备: cuda
-GPU 数量: 2
-  GPU 0: Tesla V100-SXM2-32GB (34.1 GB)
-  GPU 1: Tesla V100-SXM2-32GB (34.1 GB)
-wandb: [wandb.login()] Loaded credentials for https://api.bandw.top from /root/.netrc.
-wandb: Currently logged in as: glegexy (glegexy-fun) to https://api.bandw.top. Use `wandb login --relogin` to force relogin
-wandb: setting up run g4zrm3ae
-wandb: Tracking run with wandb version 0.25.1
-wandb: Run data is saved locally in /mnt/workspace/workgroup/qq/ts/whisper/wandb/run-20260322_010020-g4zrm3ae
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run joint-α0.5-lr1e-05-260322-010015
-wandb: ⭐️ View project at https://app.bandw.top/glegexy-fun/whisper-shanghai-finetuning
-wandb: 🚀 View run at https://app.bandw.top/glegexy-fun/whisper-shanghai-finetuning/runs/g4zrm3ae
-✓ WandB 初始化成功: https://app.bandw.top/glegexy-fun/whisper-shanghai-finetuning/runs/g4zrm3ae
-
-加载数据集: dataset/shanghai/shanghai_dataset
-✓ 训练样本: 3145
-✓ 测试样本: 787
-样本示例:
-  上海话: 诶，搿网哴向伐是现在搿群里相辣辣发[+]
-  普通话: 诶，这网上不是现在群里在发[+]
-
-加载 Whisper 处理器: openai/whisper-small
-[W322 01:00:26.853080863 Utils.hpp:137] Warning: Environment variable NCCL_ASYNC_ERROR_HANDLING is deprecated; use TORCH_NCCL_ASYNC_ERROR_HANDLING instead (function operator())
-/mnt/workspace/workgroup/qq/ts/whisper/find_tune/train_cascade_joint.py:350: FutureWarning: `tokenizer` is deprecated and will be removed in version 5.0.0 for `CascadeJointTrainer.__init__`. Use `processing_class` instead.
-  super().__init__(*args, **kwargs)
-加载翻译分词器: /mnt/workspace/workgroup/qq/ts/whisper/exp/translation-mt5-small-260320-231422/final_model
-发现预处理缓存，直接加载: dataset/shanghai/shanghai_dataset/preprocessed_joint
-
-加载 Whisper 模型: openai/whisper-small
-加载翻译模型: /mnt/workspace/workgroup/qq/ts/whisper/exp/translation-mt5-small-260320-231422/final_model
-
-创建级联联合模型...
-
-Whisper 模型参数:
-可训练参数: 240,582,912 / 241,734,912 (99.52%)
-翻译模型参数:
-可训练参数: 300,176,768 / 300,176,768 (100.00%)
-✓ 使用 BF16 混合精度训练（更稳定，不易溢出）
-[W322 01:00:37.206736590 Utils.hpp:137] Warning: Environment variable NCCL_ASYNC_ERROR_HANDLING is deprecated; use TORCH_NCCL_ASYNC_ERROR_HANDLING instead (function operator())
-/mnt/workspace/workgroup/qq/ts/whisper/find_tune/train_cascade_joint.py:350: FutureWarning: `tokenizer` is deprecated and will be removed in version 5.0.0 for `CascadeJointTrainer.__init__`. Use `processing_class` instead.
-  super().__init__(*args, **kwargs)
-Detected kernel version 4.19.91, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
-
-======================================================================
-开始级联联合训练...
-Loss = 0.50 * ASR + 0.50 * Translation
-======================================================================
-dsw92354-5548566499-g9hsl:106647:106647 [0] NCCL INFO Bootstrap : Using eth0:33.78.37.208<0>
-dsw92354-5548566499-g9hsl:106647:106647 [0] NCCL INFO NET/Plugin: No plugin found (libnccl-net.so)
-dsw92354-5548566499-g9hsl:106647:106647 [0] NCCL INFO NET/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-net.so
-dsw92354-5548566499-g9hsl:106647:106647 [0] NCCL INFO NET/Plugin: Using internal network plugin.
-dsw92354-5548566499-g9hsl:106647:106647 [0] NCCL INFO cudaDriverVersion 12040
-NCCL version 2.21.5+cuda11.0
-dsw92354-5548566499-g9hsl:106648:106648 [1] NCCL INFO cudaDriverVersion 12040
-dsw92354-5548566499-g9hsl:106648:106648 [1] NCCL INFO Bootstrap : Using eth0:33.78.37.208<0>
-dsw92354-5548566499-g9hsl:106648:106648 [1] NCCL INFO NET/Plugin: No plugin found (libnccl-net.so)
-dsw92354-5548566499-g9hsl:106648:106648 [1] NCCL INFO NET/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-net.so
-dsw92354-5548566499-g9hsl:106648:106648 [1] NCCL INFO NET/Plugin: Using internal network plugin.
-dsw92354-5548566499-g9hsl:106647:106647 [0] NCCL INFO Comm config Blocking set to 1
-dsw92354-5548566499-g9hsl:106648:106648 [1] NCCL INFO Comm config Blocking set to 1
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO NET/IB : No device found.
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO NET/IB : No device found.
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO NET/Socket : Using [0]eth0:33.78.37.208<0>
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO NET/Socket : Using [0]eth0:33.78.37.208<0>
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO Using non-device net plugin version 0
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO Using network Socket
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO Using non-device net plugin version 0
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO Using network Socket
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO ncclCommInitRank comm 0x558cc13bf090 rank 1 nranks 2 cudaDev 1 nvmlDev 1 busId dc000 commId 0x732b9f55c3ab3dd - Init START
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO ncclCommInitRank comm 0x5619a9be8ae0 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId db000 commId 0x732b9f55c3ab3dd - Init START
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO comm 0x5619a9be8ae0 rank 0 nRanks 2 nNodes 1 localRanks 2 localRank 0 MNNVL 0
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO NCCL_MAX_NCHANNELS set by environment to 2.
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO comm 0x558cc13bf090 rank 1 nRanks 2 nNodes 1 localRanks 2 localRank 1 MNNVL 0
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO NCCL_MIN_NCHANNELS set by environment to 2.
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO Channel 00/02 :    0   1
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO Channel 01/02 :    0   1
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO NCCL_MAX_NCHANNELS set by environment to 2.
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 1/-1/-1->0->-1
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO NCCL_MIN_NCHANNELS set by environment to 2.
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO P2P Chunksize set to 524288
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO Trees [0] -1/-1/-1->1->0 [1] -1/-1/-1->1->0
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO P2P Chunksize set to 524288
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/IPC
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[1] via P2P/IPC
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO Channel 00/0 : 1[1] -> 0[0] via P2P/IPC
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO Channel 01/0 : 1[1] -> 0[0] via P2P/IPC
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO Connected all rings
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO Connected all rings
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO Connected all trees
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO Connected all trees
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO threadThresholds 8/8/64 | 16/8/64 | 512 | 512
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO threadThresholds 8/8/64 | 16/8/64 | 512 | 512
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO 2 coll channels, 2 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO 2 coll channels, 2 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO NCCL_LAUNCH_MODE set by environment to PARALLEL
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO NCCL_LAUNCH_MODE set by environment to PARALLEL
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO TUNER/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-tuner.so
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO TUNER/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-tuner.so
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO TUNER/Plugin: Using internal tuner plugin.
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO TUNER/Plugin: Using internal tuner plugin.
-dsw92354-5548566499-g9hsl:106647:106892 [0] NCCL INFO ncclCommInitRank comm 0x5619a9be8ae0 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId db000 commId 0x732b9f55c3ab3dd - Init COMPLETE
-dsw92354-5548566499-g9hsl:106648:106893 [1] NCCL INFO ncclCommInitRank comm 0x558cc13bf090 rank 1 nranks 2 cudaDev 1 nvmlDev 1 busId dc000 commId 0x732b9f55c3ab3dd - Init COMPLETE
-[rank0]:[W322 01:00:38.846601524 Utils.hpp:112] Warning: Environment variable NCCL_ASYNC_ERROR_HANDLING is deprecated; use TORCH_NCCL_ASYNC_ERROR_HANDLING instead (function operator())
-[rank1]:[W322 01:00:38.847095781 Utils.hpp:112] Warning: Environment variable NCCL_ASYNC_ERROR_HANDLING is deprecated; use TORCH_NCCL_ASYNC_ERROR_HANDLING instead (function operator())
-  0%|          | 0/5910 [00:00<?, ?it/s]/mnt/workspace/workgroup/qq/ts/whisper/find_tune/train_cascade_joint.py:198: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
-  with torch.cuda.amp.autocast(enabled=False):
-/mnt/workspace/workgroup/qq/ts/whisper/find_tune/train_cascade_joint.py:198: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
-  with torch.cuda.amp.autocast(enabled=False):
-Passing a tuple of `past_key_values` is deprecated and will be removed in Transformers v4.48.0. You should pass an instance of `EncoderDecoderCache` instead, e.g. `past_key_values=EncoderDecoderCache.from_legacy_cache(past_key_values)`.
-Passing a tuple of `past_key_values` is deprecated and will be removed in Transformers v4.48.0. You should pass an instance of `EncoderDecoderCache` instead, e.g. `past_key_values=EncoderDecoderCache.from_legacy_cache(past_key_values)`.
-  0%|          | 1/5910 [00:04<7:21:51,  4.49s/it]  0%|          | 2/5910 [00:07<5:59:36,  3.65s/it]  0%|          | 3/5910 [00:10<5:33:31,  3.39s/it]  0%|          | 4/5910 [00:13<5:20:33,  3.26s/it]  0%|          | 5/5910 [00:16<5:13:20,  3.18s/it]  0%|          | 6/5910 [00:19<5:08:46,  3.14s/it]  0%|          | 7/5910 [00:22<5:05:23,  3.10s/it]  0%|          | 8/5910 [00:25<5:03:26,  3.08s/it]  0%|          | 9/5910 [00:28<5:02:21,  3.07s/it]  0%|          | 10/5910 [00:32<5:02:40,  3.08s/it]  0%|          | 11/5910 [00:35<5:01:07,  3.06s/it]  0%|          | 12/5910 [00:38<5:00:29,  3.06s/it]  0%|          | 13/5910 [00:41<5:00:10,  3.05s/it]  0%|          | 14/5910 [00:44<5:00:16,  3.06s/it]  0%|          | 15/5910 [00:47<5:04:51,  3.10s/it]  0%|          | 16/5910 [00:50<5:03:15,  3.09s/it]  0%|          | 17/5910 [00:53<5:02:58,  3.08s/it]  0%|          | 18/5910 [00:56<5:01:01,  3.07s/it]  0%|          | 19/5910 [00:59<4:59:49,  3.05s/it]  0%|          | 20/5910 [01:02<5:00:40,  3.06s/it]  0%|          | 21/5910 [01:05<5:00:36,  3.06s/it]  0%|          | 22/5910 [01:08<5:00:57,  3.07s/it]  0%|          | 23/5910 [01:11<5:00:38,  3.06s/it]  0%|          | 24/5910 [01:14<5:00:26,  3.06s/it]  0%|          | 25/5910 [01:17<5:00:23,  3.06s/it]Step 25: Total=17.6963, ASR=3.4140, Trans=0.9900
-                                                   {'loss': 17.6963, 'grad_norm': 100.64738464355469, 'learning_rate': 9.600000000000001e-07, 'asr_loss': 3.414036740064621, 'translation_loss': 0.9899591570720077, 'epoch': 0.13}
-  0%|          | 25/5910 [01:18<5:00:23,  3.06s/it]  0%|          | 26/5910 [01:21<5:00:46,  3.07s/it]  0%|          | 27/5910 [01:24<5:00:15,  3.06s/it]  0%|          | 28/5910 [01:27<5:00:03,  3.06s/it]  0%|          | 29/5910 [01:30<4:59:16,  3.05s/it]  1%|          | 30/5910 [01:33<4:59:19,  3.05s/it]  1%|          | 31/5910 [01:36<4:59:07,  3.05s/it]  1%|          | 32/5910 [01:39<4:59:00,  3.05s/it]  1%|          | 33/5910 [01:42<5:02:09,  3.08s/it]  1%|          | 34/5910 [01:45<5:04:00,  3.10s/it]  1%|          | 35/5910 [01:48<5:02:22,  3.09s/it]  1%|          | 36/5910 [01:51<5:01:16,  3.08s/it]  1%|          | 37/5910 [01:54<5:01:03,  3.08s/it]  1%|          | 38/5910 [01:57<4:59:46,  3.06s/it]  1%|          | 39/5910 [02:00<4:59:59,  3.07s/it]  1%|          | 40/5910 [02:03<4:59:10,  3.06s/it]  1%|          | 41/5910 [02:07<4:58:46,  3.05s/it]  1%|          | 42/5910 [02:10<4:59:27,  3.06s/it]  1%|          | 43/5910 [02:13<5:02:17,  3.09s/it]  1%|          | 44/5910 [02:16<5:04:10,  3.11s/it]  1%|          | 45/5910 [02:19<5:05:38,  3.13s/it]  1%|          | 46/5910 [02:22<5:03:48,  3.11s/it]  1%|          | 47/5910 [02:25<5:03:01,  3.10s/it]  1%|          | 48/5910 [02:28<5:01:41,  3.09s/it]  1%|          | 49/5910 [02:31<5:00:20,  3.07s/it]  1%|          | 50/5910 [02:34<5:00:15,  3.07s/it]Step 50: Total=15.9090, ASR=2.7189, Trans=1.0920
-                                                   {'loss': 15.909, 'grad_norm': 73.13944244384766, 'learning_rate': 1.9600000000000003e-06, 'asr_loss': 2.7188607650995253, 'translation_loss': 1.091951277796179, 'epoch': 0.25}
-  1%|          | 50/5910 [02:34<5:00:15,  3.07s/it]  1%|          | 51/5910 [02:38<5:00:58,  3.08s/it]  1%|          | 52/5910 [02:41<5:00:29,  3.08s/it]  1%|          | 53/5910 [02:44<4:59:51,  3.07s/it]  1%|          | 54/5910 [02:47<4:59:22,  3.07s/it]  1%|          | 55/5910 [02:50<4:58:15,  3.06s/it]  1%|          | 56/5910 [02:53<4:58:23,  3.06s/it]  1%|          | 57/5910 [02:56<4:57:54,  3.05s/it]  1%|          | 58/5910 [02:59<4:58:09,  3.06s/it]  1%|          | 59/5910 [03:02<4:57:21,  3.05s/it]  1%|          | 60/5910 [03:05<4:57:30,  3.05s/it]  1%|          | 61/5910 [03:08<4:57:49,  3.06s/it]  1%|          | 62/5910 [03:11<4:57:50,  3.06s/it]  1%|          | 63/5910 [03:14<4:57:42,  3.05s/it]  1%|          | 64/5910 [03:17<4:57:10,  3.05s/it]  1%|          | 65/5910 [03:20<4:57:47,  3.06s/it]  1%|          | 66/5910 [03:23<4:58:31,  3.06s/it]  1%|          | 67/5910 [03:27<5:01:12,  3.09s/it]  1%|          | 68/5910 [03:30<5:00:14,  3.08s/it]  1%|          | 69/5910 [03:33<4:59:09,  3.07s/it]  1%|          | 70/5910 [03:36<4:59:08,  3.07s/it]  1%|          | 71/5910 [03:39<4:58:37,  3.07s/it]  1%|          | 72/5910 [03:42<4:58:42,  3.07s/it]  1%|          | 73/5910 [03:45<4:58:21,  3.07s/it]  1%|▏         | 74/5910 [03:48<4:57:31,  3.06s/it]  1%|▏         | 75/5910 [03:51<4:57:01,  3.05s/it]Step 75: Total=12.7902, ASR=2.0812, Trans=0.8727
-                                                   {'loss': 12.7902, 'grad_norm': 60.325138092041016, 'learning_rate': 2.96e-06, 'asr_loss': 2.081189096868038, 'translation_loss': 0.8726602084282785, 'epoch': 0.38}
-  1%|▏         | 75/5910 [03:51<4:57:01,  3.05s/it]  1%|▏         | 76/5910 [03:54<4:57:29,  3.06s/it]  1%|▏         | 77/5910 [03:57<4:57:45,  3.06s/it]  1%|▏         | 78/5910 [04:00<5:01:47,  3.10s/it]  1%|▏         | 79/5910 [04:03<4:59:49,  3.09s/it]  1%|▏         | 80/5910 [04:06<4:58:37,  3.07s/it]  1%|▏         | 81/5910 [04:09<4:57:50,  3.07s/it]  1%|▏         | 82/5910 [04:13<4:57:29,  3.06s/it]  1%|▏         | 83/5910 [04:16<4:57:42,  3.07s/it]  1%|▏         | 84/5910 [04:19<4:57:28,  3.06s/it]  1%|▏         | 85/5910 [04:22<4:57:11,  3.06s/it]  1%|▏         | 86/5910 [04:25<4:57:00,  3.06s/it]  1%|▏         | 87/5910 [04:28<4:56:32,  3.06s/it]  1%|▏         | 88/5910 [04:31<4:57:22,  3.06s/it]  2%|▏         | 89/5910 [04:34<4:56:41,  3.06s/it]  2%|▏         | 90/5910 [04:37<4:56:15,  3.05s/it]  2%|▏         | 91/5910 [04:40<4:56:12,  3.05s/it]  2%|▏         | 92/5910 [04:43<4:56:06,  3.05s/it]  2%|▏         | 93/5910 [04:46<4:56:02,  3.05s/it]  2%|▏         | 94/5910 [04:49<4:56:48,  3.06s/it]  2%|▏         | 95/5910 [04:52<4:56:32,  3.06s/it]  2%|▏         | 96/5910 [04:55<4:55:45,  3.05s/it]  2%|▏         | 97/5910 [04:58<4:55:19,  3.05s/it]  2%|▏         | 98/5910 [05:01<4:56:30,  3.06s/it]  2%|▏         | 99/5910 [05:05<4:56:57,  3.07s/it]  2%|▏         | 100/5910 [05:08<4:56:37,  3.06s/it]Step 100: Total=11.1388, ASR=1.7693, Trans=1.3873
-                                                    {'loss': 11.1388, 'grad_norm': 60.46755599975586, 'learning_rate': 3.96e-06, 'asr_loss': 1.7693243607878686, 'translation_loss': 1.3872871839161962, 'epoch': 0.51}
-  2%|▏         | 100/5910 [05:08<4:56:37,  3.06s/it]  2%|▏         | 101/5910 [05:11<4:57:13,  3.07s/it]  2%|▏         | 102/5910 [05:14<4:57:18,  3.07s/it]  2%|▏         | 103/5910 [05:17<4:57:36,  3.08s/it]  2%|▏         | 104/5910 [05:20<4:58:00,  3.08s/it]
