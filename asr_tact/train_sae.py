@@ -32,81 +32,15 @@ except ImportError:
     WANDB_AVAILABLE = False
     print("⚠️ WandB 未安装。运行 'pip install wandb' 来启用训练监控。")
 
+from transformers import (
+    WhisperProcessor,
+    WhisperForConditionalGeneration,
+)
+from datasets import load_from_disk, Audio
+
 from asr_tact.sae import SAE, SAEConfig
 from asr_tact.feature_extractor import ASRFeatureExtractor, SampleFeatures
 from asr_tact.data_utils import SAEDataCollator, audio_length_to_encoder_length
-
-
-def audio_length_to_encoder_length(audio_samples: int, sample_rate: int = 16000) -> int:
-    """
-    计算音频样本数对应的 Whisper encoder 输出序列长度
-    
-    Whisper 的 mel 特征: hop_length=160, 所以 mel_frames = audio_samples // 160
-    Encoder 使用两层 stride=2 的卷积，所以 encoder_len = mel_frames // 4
-    最终: encoder_len = audio_samples // 160 // 4 = audio_samples // 640
-    但 Whisper 固定输出 1500 帧（对应 30 秒音频），短音频会被 padding
-    """
-    mel_frames = audio_samples // 160
-    encoder_len = (mel_frames + 1) // 2  # 第一层卷积 stride=2
-    encoder_len = (encoder_len + 1) // 2  # 第二层卷积 stride=2
-    return encoder_len
-
-
-class SAEDataCollator:
-    """
-    SAE 训练的数据整理器
-    
-    Whisper 要求 mel 特征长度固定为 3000（对应 30 秒音频），
-    因此所有音频都 padding 到 30 秒，并记录实际长度用于 mask
-    """
-    
-    # Whisper 固定参数
-    WHISPER_SAMPLE_RATE = 16000
-    WHISPER_MAX_AUDIO_SAMPLES = 480000  # 30 秒 * 16000 Hz
-    WHISPER_ENCODER_SEQ_LEN = 1500  # 固定输出长度
-    
-    def __init__(self, processor: WhisperProcessor):
-        self.processor = processor
-        self.feature_extractor = processor.feature_extractor
-    
-    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
-        # 获取所有音频数组
-        audio_arrays = [f["audio"]["array"] for f in features]
-        audio_lengths = [len(arr) for arr in audio_arrays]
-        
-        # 使用 processor 处理音频，固定 padding 到 30 秒（Whisper 要求）
-        batch_input_features = []
-        for audio_array in audio_arrays:
-            # 截断超过 30 秒的音频
-            if len(audio_array) > self.WHISPER_MAX_AUDIO_SAMPLES:
-                audio_array = audio_array[:self.WHISPER_MAX_AUDIO_SAMPLES]
-            
-            inputs = self.feature_extractor(
-                audio_array,
-                sampling_rate=self.WHISPER_SAMPLE_RATE,
-                return_tensors="np",
-            )
-            batch_input_features.append(inputs.input_features[0])
-        
-        # 计算每个样本在 encoder 输出中的实际长度
-        encoder_lengths = [
-            min(audio_length_to_encoder_length(length), self.WHISPER_ENCODER_SEQ_LEN)
-            for length in audio_lengths
-        ]
-        
-        # 创建 attention mask: 1 表示有效位置，0 表示 padding
-        # Whisper encoder 固定输出 1500 帧
-        attention_masks = []
-        for enc_len in encoder_lengths:
-            mask = torch.zeros(self.WHISPER_ENCODER_SEQ_LEN)
-            mask[:enc_len] = 1.0
-            attention_masks.append(mask)
-        
-        return {
-            "input_features": torch.tensor(np.stack(batch_input_features), dtype=torch.float32),
-            "attention_mask": torch.stack(attention_masks),
-            "encoder_lengths": torch.tensor(encoder_lengths, dtype=torch.long),
-        }
 
 
 def setup_logging(output_dir: str) -> logging.Logger:
