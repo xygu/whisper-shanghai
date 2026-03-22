@@ -319,6 +319,7 @@ class ASRFeatureExtractor:
         rms = librosa.feature.rms(y=audio, frame_length=frame_length, hop_length=hop_length)[0]
         
         # 计算过零率
+        zcr = librosa.feature.zero_crossing_rate(y=audio, frame_length=frame_length, hop_length=hop_length)[0]
         
         # VAD: 能量 > 阈值 且 过零率在合理范围内 (语音通常 0.02-0.2)
         # 阈值: 使用能量的 Otsu 自适应阈值
