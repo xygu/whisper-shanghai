@@ -74,7 +74,7 @@ def cmd_analyze(args):
         output_dir=args.output_dir or os.path.join(config.get('output', {}).get('base_dir', './exp/asr_tact'), 'neuron_analysis'),
         encoder_layer=args.encoder_layer or config.get('sae', {}).get('encoder_layer', 12),
         topk=args.topk or config.get('sae', {}).get('topk', 64),
-        max_samples=args.max_samples or analysis_config.get('max_samples', 1000),
+        max_samples=args.max_samples or analysis_config.get('max_samples', 4000),
         device=args.device or config.get('hardware', {}).get('device', 'cuda'),
     )
 
