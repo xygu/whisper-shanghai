@@ -13,7 +13,7 @@ ASR-TACT: Targeted Activation Concept Tuning for ASR
     python run_asr_tact.py train_sae --config asr_tact/config.yaml
     
     # 分析神经元
-    python run_asr_tact.py analyze --sae_checkpoint exp/sae/best_model.pt
+    python run_asr_tact.py analyze --sae_checkpoint exp/asr_tact/sae/sae-layer12-260322-042557/best_model.pt
     
     # 训练门控 LoRA
     python run_asr_tact.py train_gated_lora --sae_checkpoint exp/sae/best_model.pt --analysis_dir exp/neuron_analysis

@@ -1,0 +1,10 @@
+# 1. 训练 SAE
+python run_asr_tact.py train_sae --config asr_tact/config.yaml
+
+# 2. 分析神经元 (生成 LLM prompt)
+python run_asr_tact.py analyze --sae_checkpoint exp/asr_tact/sae/best_model.pt
+
+# 3. 训练门控 LoRA
+python run_asr_tact.py train_gated_lora \
+    --sae_checkpoint exp/asr_tact/sae/best_model.pt \
+    --analysis_dir exp/asr_tact/neuron_analysis/analysis-xxx
