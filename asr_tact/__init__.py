@@ -6,15 +6,43 @@ ASR-TACT: Targeted Activation Concept Tuning for ASR
 
 核心组件:
 - SAE: 稀疏自编码器，将隐层表征投射到高维稀疏空间
-- FeatureExtractor: 音频特征提取器（声学/语言/错误模式）
-- NeuronAnalyzer: 神经元激活分析和语义标注
+- ASRFeatureExtractor: 音频特征提取器（三层特征：声学/语言/错误模式）
+- NeuronAnalyzer: 神经元激活分析，输出供 LLM 手动标注的 JSON
 - GatedLoRA: 门控 LoRA 微调模块
+
+输出格式:
+1. sample_features.json: 每条样本的完整三层特征 + 神经元激活值
+2. neuron_top_samples.json: 每个神经元 top 10% 高激活样本的特征汇总
 """
 
-from .sae import SAE
-from .feature_extractor import ASRFeatureExtractor
-from .neuron_analyzer import NeuronAnalyzer
-from .gated_lora import GatedLoRAModel, GatedLoRAConfig, GatedLoRALinear
+from .sae import SAE, SAEConfig
+from .feature_extractor import (
+    ASRFeatureExtractor,
+    AcousticFeatures,
+    LinguisticFeatures,
+    ErrorPatternFeatures,
+    SampleFeatures,
+)
+from .neuron_analyzer import (
+    NeuronAnalyzer,
+    SampleActivationRecord,
+    NeuronTopSamples,
+)
+from .gated_lora import GatedLoRALinear, GatedLoRAConfig, GatedLoRAModel
 
 __version__ = "0.1.0"
-__all__ = ["SAE", "ASRFeatureExtractor", "NeuronAnalyzer", "GatedLoRAModel", "GatedLoRAConfig", "GatedLoRALinear"]
+__all__ = [
+    "SAE",
+    "SAEConfig",
+    "ASRFeatureExtractor",
+    "AcousticFeatures",
+    "LinguisticFeatures",
+    "ErrorPatternFeatures",
+    "SampleFeatures",
+    "NeuronAnalyzer",
+    "SampleActivationRecord",
+    "NeuronTopSamples",
+    "GatedLoRALinear",
+    "GatedLoRAConfig",
+    "GatedLoRAModel",
+]

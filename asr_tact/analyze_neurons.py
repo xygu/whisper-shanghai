@@ -129,7 +129,7 @@ def analyze_neurons(
     # 创建神经元分析器
     analyzer = NeuronAnalyzer(
         latent_dim=sae_config.latent_dim,
-        top_k_samples=20,
+        top_percent=0.1,  # top 10%
     )
     
     # 处理样本
@@ -165,7 +165,7 @@ def analyze_neurons(
             _, _, sparse = sae(hidden_states, topk)
             activations = sparse.squeeze(0)  # [seq_len, latent_dim]
         
-        # 提取样本特征
+        # 提取样本的三层特征
         sample_features = feature_extractor.extract_features(
             audio=audio_array,
             transcript=transcript,
@@ -173,25 +173,24 @@ def analyze_neurons(
             sample_id=sample_id,
         )
         
-        # 记录激活
-        analyzer.record_activation(
+        # 记录样本 (使用新接口，分别传入三层特征)
+        analyzer.record_sample(
             sample_id=sample_id,
             activations=activations,
-            features=sample_features.to_dict(),
-            threshold=0.0,
+            acoustic_features=sample_features.acoustic.to_dict(),
+            linguistic_features=sample_features.linguistic.to_dict(),
+            error_pattern_features=sample_features.error_pattern.to_dict(),
+            metadata={'audio_path': sample.get('path', '')},
+            activation_threshold=0.0,
         )
     
-    # 计算统计信息
-    logger.info("Computing neuron statistics...")
-    analyzer.compute_statistics()
-    
-    # 计算特征关联
-    logger.info("Computing feature correlations...")
-    analyzer.compute_correlations()
+    # 计算每个神经元的 top 10% 样本汇总
+    logger.info("Computing neuron top 10% samples...")
+    analyzer.compute_neuron_top_samples()
     
     # 导出分析结果
     logger.info("Exporting analysis results...")
-    analyzer.export_neuron_data(output_dir, top_n=100)
+    analyzer.export_data(output_dir, top_n_neurons=100)
     
     # 保存分析器状态
     analyzer_path = os.path.join(output_dir, 'analyzer_state.json')
