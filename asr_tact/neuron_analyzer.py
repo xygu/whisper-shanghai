@@ -67,7 +67,30 @@ class NeuronTopSamples:
     error_distribution: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> dict:
-        return asdict(self)
+        def convert_to_dict(obj):
+            """递归将 defaultdict 转换为普通 dict"""
+            if isinstance(obj, defaultdict):
+                return {k: convert_to_dict(v) for k, v in obj.items()}
+            elif isinstance(obj, dict):
+                return {k: convert_to_dict(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_to_dict(item) for item in obj]
+            else:
+                return obj
+        
+        return {
+            'neuron_id': self.neuron_id,
+            'total_samples': self.total_samples,
+            'activation_count': self.activation_count,
+            'activation_rate': self.activation_rate,
+            'mean_activation': self.mean_activation,
+            'max_activation': self.max_activation,
+            'percentile_90_activation': self.percentile_90_activation,
+            'top_samples': convert_to_dict(self.top_samples),
+            'acoustic_distribution': convert_to_dict(self.acoustic_distribution),
+            'linguistic_distribution': convert_to_dict(self.linguistic_distribution),
+            'error_distribution': convert_to_dict(self.error_distribution),
+        }
 
 
 class NeuronAnalyzer:
