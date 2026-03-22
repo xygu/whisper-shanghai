@@ -5,15 +5,19 @@ ASR-TACT: Targeted Activation Concept Tuning for ASR
 主运行脚本，支持以下功能：
 1. train_sae: 训练 SAE 模型
 2. analyze: 分析神经元激活和特征关联
-3. train_gated_lora: 训练门控 LoRA 模型
-4. inference: 使用训练好的模型进行推理
+3. counterfactual: 反事实分析找关键神经元
+4. train_gated_lora: 训练门控 LoRA 模型
+5. inference: 使用训练好的模型进行推理
 
 使用示例:
     # 训练 SAE
     python run_asr_tact.py train_sae --config asr_tact/config.yaml
     
     # 分析神经元
-    python run_asr_tact.py analyze --sae_checkpoint exp/asr_tact/sae/sae-layer12-260322-042557/best_model.pt
+    python run_asr_tact.py analyze --sae_checkpoint exp/asr_tact/sae/best_model.pt
+    
+    # 反事实分析（找关键神经元）
+    python run_asr_tact.py counterfactual --sae_checkpoint exp/asr_tact/sae/best_model.pt
     
     # 训练门控 LoRA
     python run_asr_tact.py train_gated_lora --sae_checkpoint exp/sae/best_model.pt --analysis_dir exp/neuron_analysis
@@ -79,6 +83,24 @@ def cmd_analyze(args):
     )
 
 
+def cmd_counterfactual(args):
+    """反事实分析"""
+    from asr_tact.counterfactual_analysis import run_counterfactual_analysis
+    
+    config = load_config(args.config) if args.config else {}
+    
+    run_counterfactual_analysis(
+        sae_checkpoint=args.sae_checkpoint,
+        model_name=args.model_name or config.get('whisper', {}).get('model_name', 'openai/whisper-medium'),
+        dataset_path=args.dataset_path or config.get('dataset', {}).get('path', 'dataset/shanghai/shanghai_dataset'),
+        output_dir=args.output_dir or os.path.join(config.get('output', {}).get('base_dir', './exp/asr_tact'), 'counterfactual'),
+        encoder_layer=args.encoder_layer or config.get('sae', {}).get('encoder_layer', 12),
+        topk=args.topk or config.get('sae', {}).get('topk', 64),
+        max_samples=args.max_samples or 200,
+        compute_ablation=args.compute_ablation,
+        device=args.device or config.get('hardware', {}).get('device', 'cuda'),
+    )
+
 def cmd_train_gated_lora(args):
     """训练门控 LoRA"""
     import torch
@@ -130,24 +152,53 @@ def cmd_train_gated_lora(args):
     
     # 加载神经元分析结果
     print(f"Loading neuron analysis: {args.analysis_dir}")
+    
+    # 尝试加载新格式（neuron_top_samples.json）或旧格式（neuron_correlations.json）
+    neuron_correlations = {}
+    neuron_stats = {}
+    
+    # 新格式
+    top_samples_path = os.path.join(args.analysis_dir, 'neuron_top_samples.json')
+    if os.path.exists(top_samples_path):
+        with open(top_samples_path, 'r') as f:
+            neuron_top_samples = json.load(f)
+        for nid_str, data in neuron_top_samples.items():
+            nid = int(nid_str)
+            neuron_stats[nid] = {'activation_rate': data.get('activation_rate', 0)}
+            neuron_correlations[nid] = data.get('feature_distribution', {})
+    
+    # 旧格式兼容
     correlations_path = os.path.join(args.analysis_dir, 'neuron_correlations.json')
-    with open(correlations_path, 'r') as f:
-        neuron_correlations = json.load(f)
+    if os.path.exists(correlations_path) and not neuron_correlations:
+        with open(correlations_path, 'r') as f:
+            neuron_correlations = {int(k): v for k, v in json.load(f).items()}
     
     stats_path = os.path.join(args.analysis_dir, 'neuron_stats.json')
-    with open(stats_path, 'r') as f:
-        neuron_stats = json.load(f)
+    if os.path.exists(stats_path) and not neuron_stats:
+        with open(stats_path, 'r') as f:
+            neuron_stats = {int(k): v for k, v in json.load(f).items()}
+    
+    # 加载反事实分析结果（如果有）
+    counterfactual_results = None
+    cf_path = args.counterfactual_dir or os.path.join(
+        os.path.dirname(args.analysis_dir), 'counterfactual', 'counterfactual_results.json'
+    )
+    if os.path.exists(cf_path):
+        print(f"Loading counterfactual results: {cf_path}")
+        with open(cf_path, 'r') as f:
+            counterfactual_results = json.load(f)
     
     # 选择门控神经元
     neuron_importance = {
-        int(k): v['activation_rate'] 
+        k: v.get('activation_rate', 0) 
         for k, v in neuron_stats.items()
     }
     
     gate_neurons = select_gate_neurons(
         neuron_importance=neuron_importance,
-        neuron_correlations={int(k): v for k, v in neuron_correlations.items()},
+        neuron_correlations=neuron_correlations,
         top_n=gated_lora_config.get('num_gate_neurons', 64),
+        counterfactual_results=counterfactual_results,
     )
     
     print(f"Selected {len(gate_neurons)} gate neurons")
@@ -363,10 +414,24 @@ Examples:
     parser_analyze.add_argument('--max_samples', type=int, help='Max samples to analyze')
     parser_analyze.add_argument('--device', type=str, help='Device')
     
+    # counterfactual 子命令
+    parser_cf = subparsers.add_parser('counterfactual', help='Counterfactual analysis to find key neurons')
+    parser_cf.add_argument('--sae_checkpoint', type=str, required=True, help='SAE checkpoint path')
+    parser_cf.add_argument('--config', type=str, default='asr_tact/config.yaml', help='Config file path')
+    parser_cf.add_argument('--model_name', type=str, help='Whisper model name')
+    parser_cf.add_argument('--dataset_path', type=str, help='Dataset path')
+    parser_cf.add_argument('--output_dir', type=str, help='Output directory')
+    parser_cf.add_argument('--encoder_layer', type=int, help='Encoder layer')
+    parser_cf.add_argument('--topk', type=int, help='TopK')
+    parser_cf.add_argument('--max_samples', type=int, default=200, help='Max samples for gradient analysis')
+    parser_cf.add_argument('--compute_ablation', action='store_true', help='Also compute ablation impact (slower)')
+    parser_cf.add_argument('--device', type=str, help='Device')
+    
     # train_gated_lora 子命令
     parser_lora = subparsers.add_parser('train_gated_lora', help='Train Gated LoRA model')
     parser_lora.add_argument('--sae_checkpoint', type=str, required=True, help='SAE checkpoint path')
     parser_lora.add_argument('--analysis_dir', type=str, required=True, help='Neuron analysis directory')
+    parser_lora.add_argument('--counterfactual_dir', type=str, help='Counterfactual analysis directory (optional)')
     parser_lora.add_argument('--config', type=str, default='asr_tact/config.yaml', help='Config file path')
     parser_lora.add_argument('--model_name', type=str, help='Whisper model name')
     parser_lora.add_argument('--dataset_path', type=str, help='Dataset path')
@@ -385,6 +450,8 @@ Examples:
         cmd_train_sae(args)
     elif args.command == 'analyze':
         cmd_analyze(args)
+    elif args.command == 'counterfactual':
+        cmd_counterfactual(args)
     elif args.command == 'train_gated_lora':
         cmd_train_gated_lora(args)
     elif args.command == 'inference':

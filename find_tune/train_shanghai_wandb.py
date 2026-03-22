@@ -194,7 +194,8 @@ def setup_lora(model, lora_r: int = 8, lora_alpha: int = 32, lora_dropout: float
 
 
 def setup_adalora(model, init_r: int = 12, target_r: int = 8, lora_alpha: int = 32, 
-                  lora_dropout: float = 0.1, beta1: float = 0.85, beta2: float = 0.85):
+                  lora_dropout: float = 0.1, beta1: float = 0.85, beta2: float = 0.85,
+                  total_step: int = 10000):
     """
     配置 AdaLoRA 微调（自适应低秩适配）
     
@@ -209,6 +210,7 @@ def setup_adalora(model, init_r: int = 12, target_r: int = 8, lora_alpha: int = 
         lora_dropout: Dropout 比例
         beta1: 重要性分数的移动平均系数
         beta2: 不确定性的移动平均系数
+        total_step: 总训练步数（AdaLoRA 必需参数）
     
     Returns:
         配置了 AdaLoRA 的模型
@@ -228,14 +230,15 @@ def setup_adalora(model, init_r: int = 12, target_r: int = 8, lora_alpha: int = 
         beta2=beta2,
         target_modules=["q_proj", "v_proj", "k_proj", "out_proj", "fc1", "fc2"],
         # AdaLoRA 特有参数
+        total_step=total_step,  # 总训练步数（必需）
         tinit=200,  # 开始裁剪秩的步数
-        tfinal=1000,  # 停止裁剪秩的步数
+        tfinal=min(1000, total_step // 2),  # 停止裁剪秩的步数
         deltaT=10,  # 每隔多少步更新一次秩
     )
     
     # 应用 AdaLoRA
     model = get_peft_model(model, adalora_config)
-    logger.info(f"✓ AdaLoRA 配置完成 (init_r={init_r}, target_r={target_r}, alpha={lora_alpha})")
+    logger.info(f"✓ AdaLoRA 配置完成 (init_r={init_r}, target_r={target_r}, alpha={lora_alpha}, total_step={total_step})")
     
     return model
 
@@ -386,7 +389,7 @@ class DataCollatorSpeechSeq2SeqWithPadding:
     def __call__(self, features: List[Dict[str, Union[List[int], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
         # 处理音频输入
         input_features = [{"input_features": feature["input_features"]} for feature in features]
-        batch = lf.processor.feature_extractor.pad(input_features, return_tensors="pt")
+        batch = self.processor.feature_extractor.pad(input_features, return_tensors="pt")
 
         # 处理标签
         label_features = [{"input_ids": feature["labels"]} for feature in features]
@@ -810,10 +813,17 @@ def main():
     
     # ==================== 准备数据集（在加载模型之前，避免多进程与 CUDA/LoRA 冲突）====================
     # 预处理缓存路径：e2e 和 cascade 使用不同的目标文本，需要不同的缓存
-    # - cascade: 目标是上海话文本 (text)，缓存后缀 _cascade
+    # - cascade: 目标是上海话文本 (text)，缓存后缀 _cascade 或 _joint（兼容旧版本）
     # - e2e: 目标是普通话文本 (text_cn)，缓存后缀 _e2e
     cache_suffix = "_e2e" if is_e2e else "_cascade"
     cache_dir = os.path.join(dataset_path, f"preprocessed{cache_suffix}")
+    
+    # 兼容旧版本：cascade 模式也检查 preprocessed_joint 缓存
+    if not is_e2e and not os.path.exists(cache_dir):
+        joint_cache_dir = os.path.join(dataset_path, "preprocessed_joint")
+        if os.path.exists(joint_cache_dir):
+            cache_dir = joint_cache_dir
+            logger.info(f"使用兼容缓存目录: {cache_dir}")
     
     # 检查数据集是否包含普通话文本（用于级联模式最终评估）
     has_text_cn = "text_cn" in dataset["train"].column_names if "train" in dataset else False
@@ -877,12 +887,18 @@ def main():
     
     elif args.finetune_method == "adalora":
         logger.info(f"配置 AdaLoRA（自适应低秩适配）...")
+        # 计算总训练步数（AdaLoRA 必需参数）
+        num_train_samples = len(dataset["train"])
+        steps_per_epoch = num_train_samples // (args.batch_size * args.gradient_accumulation_steps)
+        total_step = steps_per_epoch * args.num_train_epochs
+        logger.info(f"  总训练步数: {total_step}")
         model = setup_adalora(
             model, 
             init_r=args.adalora_init_r, 
             target_r=args.adalora_target_r,
             lora_alpha=args.lora_alpha, 
-            lora_dropout=args.lora_dropout
+            lora_dropout=args.lora_dropout,
+            total_step=total_step
         )
         print_trainable_parameters(model)
         
@@ -911,7 +927,13 @@ def main():
     metric = evaluate.load("wer")
     
     # ==================== 配置训练参数 ====================
-    report_to = ["wandb", "tensorboard"] if WANDB_AVAILABLE else ["tensorboard"]
+    # DDP 训练时，只有主进程报告到 wandb，避免非主进程初始化 wandb 失败
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    is_main_process = local_rank == 0
+    if WANDB_AVAILABLE and is_main_process:
+        report_to = ["wandb", "tensorboard"]
+    else:
+        report_to = ["tensorboard"]
     
     # 学习率调度器配置
     # 如果用户指定了调度器类型，使用用户指定的；否则根据微调方法自动选择

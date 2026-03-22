@@ -425,46 +425,81 @@ def find_critical_neurons(
 
 
 def select_gate_neurons(
-    neuron_importance: Dict[int, float],
-    neuron_correlations: Dict[int, Dict],
+    neuron_importance: Dict[int, float] = None,
+    neuron_correlations: Dict[int, Dict] = None,
     top_n: int = 64,
-    min_importance: float = 0.01,
+    min_importance: float = 0.0,
+    counterfactual_results: Optional[Dict] = None,
 ) -> List[int]:
     """
-    选择门控神经元
+    选择门控神经元（参考 TaCT）
     
-    结合重要性分数和语义关联选择最佳门控神经元
+    核心原则：选择那些"改变其激活值能最大程度改善输出"的神经元
+    即反事实分析中 |delta| 最大的神经元
     
     Args:
-        neuron_importance: 神经元重要性分数
-        neuron_correlations: 神经元特征关联
+        neuron_importance: 神经元激活率（已弃用，仅作兼容）
+        neuron_correlations: 神经元特征关联（已弃用，仅作兼容）
         top_n: 选择的神经元数量
         min_importance: 最小重要性阈值
+        counterfactual_results: 反事实分析结果（必需）
+            包含 'neuron_importance' 字段，每个神经元有:
+            - delta_importance: delta 优化后的重要性（核心指标）
         
     Returns:
-        选中的神经元 ID 列表
+        选中的神经元 ID 列表（按 |delta| 排序）
     """
-    candidates = []
+    # 如果有反事实分析结果，直接使用 key_neurons
+    if counterfactual_results:
+        key_neurons = counterfactual_results.get('key_neurons', [])
+        if key_neurons:
+            selected = key_neurons[:top_n]
+            print(f"Selected {len(selected)} gate neurons from counterfactual analysis:")
+            
+            cf_neurons = counterfactual_results.get('neuron_importance', {})
+            for i, nid in enumerate(selected[:10]):
+                nid_str = str(nid)
+                if nid_str in cf_neurons:
+                    delta = cf_neurons[nid_str].get('delta_importance', 0)
+                    samples = cf_neurons[nid_str].get('sample_count', 0)
+                    print(f"  #{i+1}: Neuron {nid} - delta={delta:.6f}, samples={samples}")
+            
+            return selected
     
-    for neuron_id, importance in neuron_importance.items():
-        if importance < min_importance:
-            continue
+    # 如果没有反事实结果，从 neuron_importance 中提取 delta_importance
+    if counterfactual_results:
+        cf_neurons = counterfactual_results.get('neuron_importance', {})
+        candidates = []
+        for nid_str, data in cf_neurons.items():
+            nid = int(nid_str)
+            delta = data.get('delta_importance', 0)
+            if delta > min_importance:
+                candidates.append((nid, delta))
         
-        # 获取关联信息
-        correlation = neuron_correlations.get(neuron_id, {})
+        # 按 delta 排序
+        candidates.sort(key=lambda x: x[1], reverse=True)
+        selected = [nid for nid, _ in candidates[:top_n]]
         
-        # 计算综合分数
-        score = importance
+        print(f"Selected {len(selected)} gate neurons by delta importance:")
+        for i, (nid, delta) in enumerate(candidates[:min(10, top_n)]):
+            print(f"  #{i+1}: Neuron {nid} - delta={delta:.6f}")
         
-        # 如果与特定特征高度关联，增加分数
-        if correlation.get('contains_dialect_correlation', 0) > 0.5:
-            score *= 1.5
-        if correlation.get('high_cer_correlation', 0) > 0.5:
-            score *= 1.3
-        
-        candidates.append((neuron_id, score))
+        return selected
     
-    # 排序并选择 top_n
-    candidates.sort(key=lambda x: x[1], reverse=True)
+    # 兜底：如果没有反事实结果，使用激活率（不推荐）
+    if neuron_importance:
+        print("WARNING: No counterfactual results provided. Using activation rate as fallback.")
+        print("This is NOT recommended. Please run counterfactual analysis first.")
+        
+        candidates = [
+            (nid, rate) for nid, rate in neuron_importance.items()
+            if rate > min_importance
+        ]
+        candidates.sort(key=lambda x: x[1], reverse=True)
+        selected = [nid for nid, _ in candidates[:top_n]]
+        
+        return selected
     
-    return [nid for nid, _ in candidates[:top_n]]
+    # 如果什么都没有，返回前 top_n 个神经元
+    print("WARNING: No neuron importance data provided. Using default neurons 0 to {top_n-1}.")
+    return list(range(top_n))

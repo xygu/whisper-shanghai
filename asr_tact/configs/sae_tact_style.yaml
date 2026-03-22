@@ -1,0 +1,163 @@
+# SAE 训练配置 - 参考 TaCT 项目
+# 
+# ============================================================
+# TaCT 稀疏性控制机制详解
+# ============================================================
+#
+# 1. 稀疏性控制方式: TopK
+#    - 控制的是: 每个样本(token)激活的节点数量
+#    - 不是控制: 被激活的样本数量 或 特征数量
+#
+# 2. TopK 两种模式:
+#    - topk: 每个 token 独立选 topk 个最大激活神经元
+#    - batch_topk: 整个序列共享选 topk*seq_len 个 (更稀疏，分布不均)
+#
+# 3. 稀疏度计算:
+#    - 每个 token 激活 topk 个神经元
+#    - 稀疏度 = topk / latent_dim
+#    - 例: topk=48, latent_dim=2048 → 稀疏度 = 2.34%
+#
+# 4. TaCT 防止死神经元机制 (aux_recover):
+#    - 追踪每个神经元被激活的频率
+#    - 如果超过 1e6 个 token 未激活，标记为"死神经元"
+#    - 对死神经元单独做辅助重建，强制参与训练
+#    - scaler 动态调整辅助损失权重
+#
+# ============================================================
+# TaCT 项目实际配置:
+#   - input_dim: 1536 (BaguanV2)
+#   - latent_dim: 从 train_config['mid_dim'] 读取
+#   - topk: 从 train_config['topk'] 读取
+#   - 扩展倍数: 约 1.3x ~ 2.7x (mid_dim/input_dim)
+# ============================================================
+
+# ============================================================
+# 你的目标配置
+# ============================================================
+# 目标 1: 隐藏层 = 原来的 8~20 倍
+#   - input_dim = 1024 (Whisper-medium)
+#   - latent_dim = 8192 ~ 20480
+#
+# 目标 2: 每个节点激活 1/10 ~ 1/20 的样本
+#   - 这需要从"节点视角"统计，而非"样本视角"
+#   - TaCT 控制的是"每个样本激活多少节点"
+#   - 如果想让每个节点激活 1/10 样本，需要:
+#     topk/latent_dim ≈ 1/10 → topk ≈ latent_dim/10
+#
+# 目标 3: 重建率要高，不能太稀疏
+#   - 稀疏度 5%~10% 比较合理 (不是 0.001%)
+#   - 方差解释率 > 85%
+#
+# 目标 4: 死神经元少
+#   - TaCT 的 aux_recover 机制已实现
+#   - 死神经元率 < 1%
+
+# ============================================================
+# 配置 1: 8x 扩展，10% 稀疏度 (推荐)
+# ============================================================
+config_8x_10pct:
+  # 模型配置
+  input_dim: 1024
+  latent_dim: 8192        # 8x 扩展
+  topk: 819               # 10% 稀疏度 (8192 * 0.1)
+  norm_type: "z-norm"
+  topk_type: "batch_topk"
+  use_activate: true
+  share_weight: false
+  
+  # 训练配置
+  encoder_layer: 12
+  batch_size: 4
+  num_epochs: 20
+  learning_rate: 1e-4
+  
+  # 预期指标
+  expected_sparsity: "10.0%"      # 819/8192
+  expected_explained_var: ">90%"
+  expected_dead_neurons: "<1%"
+  
+  # 解释:
+  # - 每个 token 激活 819 个神经元 (10%)
+  # - 每个神经元平均被 10% 的 token 激活
+  # - 重建质量高，稀疏度适中
+
+# ============================================================
+# 配置 2: 8x 扩展，5% 稀疏度
+# ============================================================
+config_8x_5pct:
+  input_dim: 1024
+  latent_dim: 8192        # 8x 扩展
+  topk: 410               # 5% 稀疏度 (8192 * 0.05)
+  norm_type: "z-norm"
+  topk_type: "batch_topk"
+  use_activate: true
+  share_weight: false
+  
+  encoder_layer: 12
+  batch_size: 4
+  num_epochs: 25
+  learning_rate: 1e-4
+  
+  expected_sparsity: "5.0%"
+  expected_explained_var: ">85%"
+  expected_dead_neurons: "<1%"
+
+# ============================================================
+# 配置 3: 16x 扩展，5% 稀疏度
+# ============================================================
+config_16x_5pct:
+  input_dim: 1024
+  latent_dim: 16384       # 16x 扩展
+  topk: 819               # 5% 稀疏度 (16384 * 0.05)
+  norm_type: "z-norm"
+  topk_type: "batch_topk"
+  use_activate: true
+  share_weight: false
+  
+  encoder_layer: 12
+  batch_size: 2           # 内存限制
+  num_epochs: 30
+  learning_rate: 5e-5
+  
+  expected_sparsity: "5.0%"
+  expected_explained_var: ">80%"
+  expected_dead_neurons: "<2%"
+
+# ============================================================
+# 配置 4: 20x 扩展，5% 稀疏度 (最大规模)
+# ============================================================
+config_20x_5pct:
+  input_dim: 1024
+  latent_dim: 20480       # 20x 扩展
+  topk: 1024              # 5% 稀疏度 (20480 * 0.05)
+  norm_type: "z-norm"
+  topk_type: "batch_topk"
+  use_activate: true
+  share_weight: false
+  
+  encoder_layer: 12
+  batch_size: 2
+  num_epochs: 40
+  learning_rate: 5e-5
+  
+  expected_sparsity: "5.0%"
+  expected_explained_var: ">75%"
+  expected_dead_neurons: "<3%"
+
+# ============================================================
+# 运行命令示例
+# ============================================================
+# 
+# # 使用 8x 扩展，10% 稀疏度 (推荐首次尝试)
+# python -m asr_tact.train_sae \
+#   --latent_dim 8192 \
+#   --topk 819 \
+#   --num_epochs 20 \
+#   --batch_size 4
+#
+# # 使用 16x 扩展，5% 稀疏度
+# python -m asr_tact.train_sae \
+#   --latent_dim 16384 \
+#   --topk 819 \
+#   --num_epochs 30 \
+#   --batch_size 2

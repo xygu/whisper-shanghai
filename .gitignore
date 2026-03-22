@@ -17,3 +17,5 @@ wandb/
 whisper-shanghai-finetuned/
 temp/
 *.out
+logs/
+find_tune/.*
