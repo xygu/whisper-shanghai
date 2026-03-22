@@ -211,8 +211,8 @@ def analyze_neurons(
     logger.info(f"Total samples: {summary['total_samples']}")
     
     logger.info("\nTop 10 neurons by activation rate:")
-    for i, neuron in enumerate(summary['top_neurons'][:10]):
-        logger.info(f"  #{neuron['id']}: {neuron['activation_rate']:.2%} - {neuron['inferred_concept']}")
+    for i, neuron in enumerate(summary['top_neurons_by_activation_rate'][:10]):
+        logger.info(f"  #{neuron['neuron_id']}: {neuron['activation_rate']:.2%} (count: {neuron['activation_count']})")
 
 
 def main():

@@ -98,7 +98,7 @@ def compute_sae_statistics(
     
     # 统计变量
     total_tokens = 0
-    total_activations = 0
+    total_topk_activations = 0  # topk 选中的激活总数
     explained_vars = []
     neuron_activation_counts = torch.zeros(sae_config.latent_dim, device=device)
     
@@ -130,14 +130,21 @@ def compute_sae_statistics(
             explained_var = 1 - ((x - sparse_recover).var(dim=-2) / (x.var(dim=-2) + 1e-6)).mean()
             explained_vars.append(explained_var.item())
             
-            # 统计激活
+            # 统计激活（使用 topk 后的稀疏激活，而不是 ReLU 后的）
             batch_size, seq_len, _ = sparse.shape
             total_tokens += batch_size * seq_len
             
-            # 统计每个神经元的激活次数
-            active_mask = (sparse > 0).float()
-            neuron_activation_counts += active_mask.sum(dim=(0, 1))
-            total_activations += active_mask.sum().item()
+            # 获取 topk 后的稀疏激活和 mask
+            sparse_topk, _, mask = sae._get_topk(sparse, topk)
+            
+            # 统计每个神经元的激活次数（基于 topk mask）
+            # mask shape: [batch, seq_len, latent_dim]
+            neuron_activation_counts += mask.sum(dim=(0, 1))
+            
+            # 统计 topk 激活总数
+            # 对于 batch_topk: 每个 batch 选 topk * seq_len 个激活
+            # 对于 topk: 每个位置选 topk 个激活
+            total_topk_activations += mask.sum().item()
     
     # 计算统计指标
     avg_explained_var = np.mean(explained_vars)
@@ -149,9 +156,17 @@ def compute_sae_statistics(
     # 活跃神经元
     active_neurons = sae_config.latent_dim - dead_neurons
     
-    # 激活稀疏度
-    sparsity_rate = topk / sae_config.latent_dim
-    avg_activations_per_token = total_activations / total_tokens if total_tokens > 0 else 0
+    # 激活稀疏度计算
+    # 理论稀疏度: topk / latent_dim (每个 token 激活的神经元比例)
+    theoretical_sparsity_rate = topk / sae_config.latent_dim
+    
+    # 实际每 token 平均激活数
+    # 对于 batch_topk: 应该约等于 topk (因为 topk * seq_len 个激活分布在 seq_len 个 token 上)
+    # 对于 topk: 应该正好等于 topk
+    avg_activations_per_token = total_topk_activations / total_tokens if total_tokens > 0 else 0
+    
+    # 实际稀疏度 (基于实际激活数)
+    actual_sparsity_rate = avg_activations_per_token / sae_config.latent_dim
     
     # 神经元激活分布
     activation_counts_np = neuron_activation_counts.cpu().numpy()
@@ -174,8 +189,10 @@ def compute_sae_statistics(
         'norm_type': sae_config.norm_type,
         
         # 稀疏度指标
-        'sparsity_rate': sparsity_rate,
-        'sparsity_rate_percent': f"{sparsity_rate * 100:.4f}%",
+        'theoretical_sparsity_rate': theoretical_sparsity_rate,
+        'theoretical_sparsity_rate_percent': f"{theoretical_sparsity_rate * 100:.4f}%",
+        'actual_sparsity_rate': actual_sparsity_rate,
+        'actual_sparsity_rate_percent': f"{actual_sparsity_rate * 100:.4f}%",
         'avg_activations_per_token': avg_activations_per_token,
         
         # 重建质量
@@ -214,8 +231,10 @@ def print_stats(stats: Dict[str, Any]):
     print(f"  归一化类型:                {stats['norm_type']}")
     
     print("\n### 稀疏度指标")
-    print(f"  激活稀疏度:                {stats['sparsity_rate_percent']}")
+    print(f"  理论稀疏度 (topk/latent):  {stats['theoretical_sparsity_rate_percent']}")
+    print(f"  实际稀疏度:                {stats['actual_sparsity_rate_percent']}")
     print(f"  每 token 平均激活数:       {stats['avg_activations_per_token']:.2f}")
+    print(f"  (期望值 ≈ topk = {stats['topk']})")
     
     print("\n### 重建质量")
     print(f"  方差解释率:                {stats['avg_explained_var_percent']}")
@@ -234,15 +253,28 @@ def print_stats(stats: Dict[str, Any]):
     print(f"  90% 分位数:                {dist['percentile_90']:.0f}")
     print(f"  99% 分位数:                {dist['percentile_99']:.0f}")
     
-    print("\n### 与论文对比")
-    print("  ┌─────────────────┬──────────────────┬──────────────────┐")
-    print("  │ 指标            │ 本项目           │ Claude 论文      │")
-    print("  ├─────────────────┼──────────────────┼──────────────────┤")
-    print(f"  │ 特征字典规模    │ {stats['latent_dim']:>16,} │ 34,164,353       │")
-    print(f"  │ 激活稀疏度      │ {stats['sparsity_rate_percent']:>16} │ <0.001%          │")
-    print(f"  │ 方差解释率      │ {stats['avg_explained_var_percent']:>16} │ 67%              │")
-    print(f"  │ 死亡特征率      │ {stats['dead_neuron_rate_percent']:>16} │ <1%              │")
-    print("  └─────────────────┴──────────────────┴──────────────────┘")
+    print("\n### 与论文/TaCT 对比")
+    print("  ┌─────────────────┬──────────────────┬──────────────────┬──────────────────┐")
+    print("  │ 指标            │ 本项目           │ TaCT 参考        │ Claude 论文      │")
+    print("  ├─────────────────┼──────────────────┼──────────────────┼──────────────────┤")
+    print(f"  │ 输入维度        │ {stats['input_dim']:>16,} │ 1536             │ -                │")
+    print(f"  │ 特征字典规模    │ {stats['latent_dim']:>16,} │ 2048~4096        │ 34,164,353       │")
+    print(f"  │ TopK            │ {stats['topk']:>16} │ 48               │ -                │")
+    print(f"  │ 激活稀疏度      │ {stats['actual_sparsity_rate_percent']:>16} │ ~2.3%            │ <0.001%          │")
+    print(f"  │ 方差解释率      │ {stats['avg_explained_var_percent']:>16} │ >90%             │ 67%              │")
+    print(f"  │ 死亡特征率      │ {stats['dead_neuron_rate_percent']:>16} │ <1%              │ <1%              │")
+    print("  └─────────────────┴──────────────────┴──────────────────┴──────────────────┘")
+    
+    print("\n### 推荐超参数调整")
+    if stats['avg_explained_var'] < 0.85:
+        print("  ⚠️  方差解释率偏低，建议：")
+        print("      - 增加训练轮数")
+        print("      - 减小 latent_dim（如 2048 或 4096）")
+        print("      - 增大 topk（如 48 或 96）")
+    if stats['avg_activations_per_token'] > stats['topk'] * 1.5:
+        print("  ⚠️  每 token 激活数异常，可能存在统计 bug")
+    if stats['dead_neuron_rate'] > 0.1:
+        print("  ⚠️  死亡神经元过多，建议检查辅助损失")
     
     print("\n" + "=" * 70)
 
