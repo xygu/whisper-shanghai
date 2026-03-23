@@ -34,6 +34,9 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
+# 设置 HuggingFace 镜像（中国可用）
+os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+
 # 添加项目根目录
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -45,13 +48,161 @@ DEFAULT_CONFIG = {
     'dataset_path': 'dataset/shanghai/shanghai_dataset',
     'encoder_layer': 12,
     'latent_dim': 9000,  # 约 8.8x 扩展
-    'topk': 100,         # 稀疏度 100/9000 ≈ 1.11%
+    'topk': 256,         # 稀疏度 256/9000 ≈ 2.84%
     'norm_type': 'z-norm',
     'batch_size': 4,
     'num_epochs': 20,
     'learning_rate': 1e-4,
+    'dead_neuron_threshold': 5e5,  # 死神经元阈值
     'device': 'cuda',
 }
+
+# ============================================================
+# LLM 解释 Prompt 生成函数 (参考气象领域风格)
+# ============================================================
+def generate_neuron_explanation_prompt(
+    neuron_id: int,
+    transcripts: List[str],
+    acoustic_stats: Dict[str, List],
+    linguistic_stats: Dict[str, List],
+) -> str:
+    """
+    生成用于 LLM 解释 SAE 神经元的 prompt
+    参考气象领域的结构化 prompt 风格
+    """
+    
+    # 构建声学特征统计字符串
+    acoustic_section = ""
+    for k, values in acoustic_stats.items():
+        if values:
+            mean_val = np.mean(values)
+            std_val = np.std(values)
+            acoustic_section += f"  - {k}: mean={mean_val:.3f}, std={std_val:.3f}, n={len(values)}\n"
+    
+    # 构建语言特征统计字符串
+    linguistic_section = ""
+    for k, values in linguistic_stats.items():
+        if values:
+            if all(isinstance(v, bool) for v in values):
+                true_count = sum(values)
+                total = len(values)
+                linguistic_section += f"  - {k}: {true_count}/{total} ({true_count/total*100:.1f}% True)\n"
+            else:
+                mean_val = np.mean(values)
+                std_val = np.std(values)
+                linguistic_section += f"  - {k}: mean={mean_val:.3f}, std={std_val:.3f}\n"
+    
+    # 构建转录文本样本
+    transcript_samples = "\n".join([f"  {i+1}. \"{t}\"" for i, t in enumerate(transcripts[:15])])
+    
+    prompt = f"""You are given data from a Whisper-based Automatic Speech Recognition (ASR) model fine-tuned for Shanghainese (上海话) dialect.
+
+Model Logic:
+- Input: Raw audio waveform (Shanghainese speech)
+- Encoder: Extracts acoustic features → hidden representations
+- SAE Layer: Sparse Autoencoder applied to encoder layer 12 hidden states
+- Decoder: Generates text transcription from encoded features
+- Output: Chinese text transcription
+
+The provided data describes a **concept** extracted by a Sparse Autoencoder (SAE).
+A concept = a speech/linguistic feature detected from the audio that influences transcription output.
+
+Example interpretations:
+- "Tone contour pattern" detected → specific tonal words are transcribed
+- "Fricative consonant" detected → words with 's', 'sh', 'x' sounds appear
+- "Sentence boundary" detected → punctuation or pause-related tokens generated
+
+Your Task:
+Using the provided concept data (acoustic features, linguistic features, activation distribution, and sample transcripts), identify **three possible speech/linguistic phenomena** this neuron concept could represent, and rank them in descending order of confidence.
+
+============================================================
+DATA FORMAT DEFINITIONS
+============================================================
+
+1. **Acoustic Features Section**:
+   Statistics of audio-level features for tokens where this neuron activates highly.
+   - duration: segment duration in seconds
+   - energy: RMS energy level
+   - pitch_mean/std: fundamental frequency statistics
+   - spectral_centroid: brightness of sound
+   - zero_crossing_rate: indicator of noisiness/fricatives
+
+2. **Linguistic Features Section**:
+   Statistics of text-level features for highly-activated tokens.
+   - char_count: number of characters in transcript
+   - contains_punctuation: whether punctuation is present
+   - is_question: whether it's a question sentence
+   - dialect_markers: presence of Shanghainese-specific words
+
+3. **Sample Transcripts**:
+   Top 15 transcripts where this neuron had highest activation values.
+   These are the actual text outputs associated with high neuron activation.
+
+============================================================
+CURRENT CONCEPT DATA: Neuron #{neuron_id}
+============================================================
+
+### Acoustic Features Statistics
+{acoustic_section if acoustic_section else "  (No acoustic features available)"}
+
+### Linguistic Features Statistics
+{linguistic_section if linguistic_section else "  (No linguistic features available)"}
+
+### Sample Transcripts (Top 15 by activation)
+{transcript_samples if transcript_samples else "  (No transcripts available)"}
+
+============================================================
+REQUIRED OUTPUT FORMAT
+============================================================
+
+Return a JSON array with exactly 3 hypotheses:
+
+[
+  {{
+    "Reasoning": "<Detailed explanation of why this phenomenon matches the data>",
+    "Phenomenon": "<Name of the speech/linguistic phenomenon>",
+    "Confidence": "<1-4>"
+  }},
+  ...
+]
+
+Confidence Scoring:
+- 4: All acoustic/linguistic trends strongly match one phenomenon
+- 3: Most trends match, minor inconsistencies
+- 2: Some trends match, weaker evidence
+- 1: Very little matches, highly uncertain
+
+============================================================
+CHECKLIST FOR REASONING (You must address each item)
+============================================================
+
+1. **Transcript Pattern Analysis**: 
+   - What common words, phrases, or structures appear across samples?
+   - Are there repeated characters, syllables, or grammatical patterns?
+
+2. **Acoustic Feature Interpretation**:
+   - Do energy/pitch patterns suggest specific phonetic categories?
+   - Does duration indicate word boundaries, pauses, or specific syllable types?
+
+3. **Dialect-Specific Markers**:
+   - Are there Shanghainese-specific vocabulary or grammatical structures?
+   - Do patterns suggest tone sandhi or dialect-specific phonological rules?
+
+4. **Phonetic Category Hypothesis**:
+   - Could this neuron encode consonant types (stops, fricatives, nasals)?
+   - Could it encode vowel qualities or tonal patterns?
+
+5. **Linguistic Level**:
+   - Is this a phoneme-level, word-level, or sentence-level feature?
+   - Does it relate to syntax, semantics, or pragmatics?
+
+6. **Error Pattern Correlation**:
+   - If this neuron relates to ASR errors, what type of confusion might it cause?
+   - Homophone confusion? Tone errors? Word boundary errors?
+"""
+    
+    return prompt
+
 
 # ============================================================
 # Step 1: 训练 SAE
@@ -63,9 +214,11 @@ def cmd_train_sae(args):
     print("=" * 70)
     print("Step 1: Train SAE")
     print("=" * 70)
+    print(f"  model_name: {args.model_name}")
     print(f"  latent_dim: {args.latent_dim}")
     print(f"  topk: {args.topk}")
     print(f"  稀疏度: {args.topk / args.latent_dim * 100:.2f}%")
+    print(f"  dead_neuron_threshold: {args.dead_neuron_threshold}")
     print("=" * 70)
     
     train_sae(
@@ -79,6 +232,7 @@ def cmd_train_sae(args):
         batch_size=args.batch_size,
         num_epochs=args.num_epochs,
         learning_rate=args.learning_rate,
+        dead_neuron_threshold=args.dead_neuron_threshold,
         device=args.device,
         use_wandb=not args.no_wandb,
     )
@@ -931,6 +1085,8 @@ def main():
     p1.add_argument('--batch_size', type=int, default=DEFAULT_CONFIG['batch_size'])
     p1.add_argument('--num_epochs', type=int, default=DEFAULT_CONFIG['num_epochs'])
     p1.add_argument('--learning_rate', type=float, default=DEFAULT_CONFIG['learning_rate'])
+    p1.add_argument('--dead_neuron_threshold', type=float, default=DEFAULT_CONFIG['dead_neuron_threshold'],
+                    help='Dead neuron threshold for auxiliary loss')
     p1.add_argument('--device', default=DEFAULT_CONFIG['device'])
     p1.add_argument('--no_wandb', action='store_true')
     

@@ -108,6 +108,7 @@ def train_sae(
     batch_size: int = 4,
     num_epochs: int = 10,
     learning_rate: float = 1e-4,
+    dead_neuron_threshold: float = 5e5,
     device: str = "cuda",
     save_every: int = 1000,
     log_every: int = 100,
@@ -181,6 +182,7 @@ def train_sae(
         topk=topk,
         share_weight=False,
         learning_rate=learning_rate,
+        dead_neuron_threshold=dead_neuron_threshold,
     )
     sae = SAE(
         input_dim=sae_config.input_dim,
@@ -189,6 +191,7 @@ def train_sae(
         use_activate=sae_config.use_activate,
         topk_type=sae_config.topk_type,
         share_weight=sae_config.share_weight,
+        dead_neuron_threshold=sae_config.dead_neuron_threshold,
     )
     sae.to(device)
     
@@ -415,6 +418,8 @@ def main():
                         help="Number of epochs")
     parser.add_argument("--learning_rate", type=float, default=1e-4,
                         help="Learning rate")
+    parser.add_argument("--dead_neuron_threshold", type=float, default=5e5,
+                        help="Dead neuron threshold for auxiliary loss")
     parser.add_argument("--device", type=str, default="cuda",
                         help="Device to use")
     parser.add_argument("--save_every", type=int, default=1000,
@@ -446,6 +451,7 @@ def main():
         batch_size=args.batch_size,
         num_epochs=args.num_epochs,
         learning_rate=args.learning_rate,
+        dead_neuron_threshold=args.dead_neuron_threshold,
         device=args.device,
         save_every=args.save_every,
         log_every=args.log_every,

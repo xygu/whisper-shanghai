@@ -35,7 +35,8 @@ class SAE(nn.Module):
         norm_type: Literal['z-norm', 'layer_norm', 'rms_norm'] = 'z-norm',
         use_activate: bool = True,
         topk_type: Literal['topk', 'batch_topk'] = 'batch_topk',
-        share_weight: bool = False
+        share_weight: bool = False,
+        dead_neuron_threshold: float = 5e5,  # 死神经元阈值，可配置
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -44,6 +45,7 @@ class SAE(nn.Module):
         self.use_activate = use_activate
         self.topk_type = topk_type
         self.share_weight = share_weight
+        self.dead_neuron_threshold = dead_neuron_threshold
         
         # 初始化编码器权重 (Kaiming 初始化 + 归一化)
         encoder_weight = torch.randn(latent_dim, input_dim)
@@ -148,11 +150,11 @@ class SAE(nn.Module):
         self.use_number[topk_index.reshape(-1) % self.latent_dim] = 0
         
         # 计算死神经元比例
-        self.scaler = min((self.use_number > 1e6).sum().item() / topk, 1.0)
+        self.scaler = min((self.use_number > self.dead_neuron_threshold).sum().item() / topk, 1.0)
         
         # 创建死神经元掩码
         use_mask = self.use_number.reshape(1, 1, -1).expand(batch_size, seq_len, -1).to(x.device)
-        use_mask = torch.where(use_mask > 1e6, 1.0, 0.0)
+        use_mask = torch.where(use_mask > self.dead_neuron_threshold, 1.0, 0.0)
         
         # 仅对死神经元进行辅助重建
         aux_sparse = x * use_mask
@@ -301,7 +303,7 @@ class SAE(nn.Module):
             'aux_loss': aux_loss.item() if isinstance(aux_loss, torch.Tensor) else aux_loss,
             'total_loss': total_loss.item(),
             'explained_var': explained_var.item() if isinstance(explained_var, torch.Tensor) else explained_var,
-            'dead_neurons': (self.use_number > 1e6).sum().item(),
+            'dead_neurons': (self.use_number > self.dead_neuron_threshold).sum().item(),
         }
         
         return total_loss, loss_dict
@@ -336,6 +338,7 @@ class SAEConfig:
         topk: int = 64,
         share_weight: bool = False,
         learning_rate: float = 1e-4,
+        dead_neuron_threshold: float = 5e5,
     ):
         self.input_dim = input_dim
         self.latent_dim = latent_dim
@@ -345,6 +348,7 @@ class SAEConfig:
         self.topk = topk
         self.share_weight = share_weight
         self.learning_rate = learning_rate
+        self.dead_neuron_threshold = dead_neuron_threshold
     
     def to_dict(self) -> dict:
         return self.__dict__.copy()

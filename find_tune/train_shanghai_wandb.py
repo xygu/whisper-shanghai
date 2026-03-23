@@ -12,6 +12,7 @@ import multiprocessing
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 os.environ['WANDB_BASE_URL'] = 'https://api.bandw.top'
 
+
 import torch
 import logging
 from datetime import datetime
@@ -485,7 +486,11 @@ def compute_metrics(pred, processor, metric):
 
     # 记录 20 个固定随机样本的预测结果和真实标签对比到 WandB
     # 使用固定随机种子，确保每次实验、每个 epoch 选择的样本 ID 一致，便于对比
-    if WANDB_AVAILABLE and len(pred_str) >= 1:
+    # 注意：只有主进程（rank 0）才记录到 WandB，避免多卡训练时非主进程报错
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    is_main_process = local_rank == 0
+    
+    if WANDB_AVAILABLE and is_main_process and wandb.run is not None and len(pred_str) >= 1:
         import random
         # 创建对比表格
         comparison_table = wandb.Table(columns=["样本编号", "真实标签", "预测结果", "是否完全匹配"])
@@ -601,11 +606,17 @@ def main():
         hardware_config, args.model_size
     )
     
-    # 使用自动计算的值或用户指定的值
+    # 使用自动计算的值或用户指定的值，并更新到 args 中以便后续使用
     num_proc = args.num_proc if args.num_proc is not None else auto_num_proc
     batch_size = args.batch_size if args.batch_size is not None else auto_batch_size
     gradient_accumulation_steps = args.gradient_accumulation_steps if args.gradient_accumulation_steps is not None else auto_grad_accum
     dataloader_num_workers = args.dataloader_num_workers if args.dataloader_num_workers is not None else auto_dataloader_workers
+    
+    # 将自动计算的值更新到 args 中，确保后续代码可以通过 args 访问
+    args.num_proc = num_proc
+    args.batch_size = batch_size
+    args.gradient_accumulation_steps = gradient_accumulation_steps
+    args.dataloader_num_workers = dataloader_num_workers
     
     # 学习率：LoRA/AdaLoRA 使用更高的学习率（1e-4），全参微调使用较低的学习率（1e-5）
     if args.learning_rate is not None:
@@ -637,7 +648,7 @@ def main():
     if is_e2e:
         dataset_path = "dataset/shanghai/shanghai_unified_dataset"
     else:
-        dataset_path = "dataset/shanghai/shanghai_unified_dataset"
+        dataset_path = "dataset/shanghai/shanghai_dataset"
     
     # 统一的 WandB 项目，用 mode 分组区分
     wandb_project = "whisper-shanghai-finetuning"
@@ -928,9 +939,8 @@ def main():
     
     # ==================== 配置训练参数 ====================
     # DDP 训练时，只有主进程报告到 wandb，避免非主进程初始化 wandb 失败
-    local_rank = int(os.environ.get("LOCAL_RANK", 0))
-    is_main_process = local_rank == 0
-    if WANDB_AVAILABLE and is_main_process:
+    # 注意：local_rank 和 is_main_process 已在前面定义，这里直接使用
+    if WANDB_AVAILABLE and is_main_process and wandb.run is not None:
         report_to = ["wandb", "tensorboard"]
     else:
         report_to = ["tensorboard"]
@@ -1134,8 +1144,8 @@ def main():
                     
                     logger.info(f"✓ 级联最终 CER (到普通话): {final_mandarin_cer:.2f}%")
                     
-                    # 记录样本对比到 WandB
-                    if WANDB_AVAILABLE:
+                    # 记录样本对比到 WandB（只有主进程）
+                    if WANDB_AVAILABLE and is_main_process and wandb.run is not None:
                         cascade_table = wandb.Table(columns=[
                             "样本编号", "上海话预测", "普通话翻译", "普通话参考", "是否匹配"
                         ])
@@ -1159,8 +1169,8 @@ def main():
             logger.info("  跳过级联最终评估。如需评估，请先训练翻译模型：")
             logger.info("  python find_tune/train_translation.py")
     
-    # 记录最终指标到 WandB
-    if WANDB_AVAILABLE:
+    # 记录最终指标到 WandB（只有主进程）
+    if WANDB_AVAILABLE and is_main_process and wandb.run is not None:
         final_metrics = {
             "final/eval_loss": metrics.get("eval_loss", 0),
             "final/eval_cer_shanghai": metrics["eval_wer"],  # 到上海话的 CER
@@ -1179,7 +1189,7 @@ def main():
     logger.info(f"最终 Loss: {metrics.get('eval_loss', 0):.4f}")
     logger.info(f"模型保存位置: {output_dir}")
     
-    if WANDB_AVAILABLE:
+    if WANDB_AVAILABLE and is_main_process and wandb.run is not None:
         logger.info(f"查看完整训练报告: {wandb.run.get_url()}")
         wandb.finish()
     
