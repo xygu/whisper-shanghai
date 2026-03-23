@@ -105,6 +105,7 @@ def train_sae(
     latent_dim: int = 8192,
     topk: int = 64,
     norm_type: str = "z-norm",
+    topk_type: str = "batch_topk",
     batch_size: int = 4,
     num_epochs: int = 10,
     learning_rate: float = 1e-4,
@@ -146,6 +147,7 @@ def train_sae(
                 "latent_dim": latent_dim,
                 "topk": topk,
                 "norm_type": norm_type,
+                "topk_type": topk_type,
                 "batch_size": batch_size,
                 "num_epochs": num_epochs,
                 "learning_rate": learning_rate,
@@ -178,7 +180,7 @@ def train_sae(
         latent_dim=latent_dim,
         norm_type=norm_type,
         use_activate=True,
-        topk_type="batch_topk",
+        topk_type=topk_type,
         topk=topk,
         share_weight=False,
         learning_rate=learning_rate,
@@ -412,6 +414,9 @@ def main():
     parser.add_argument("--norm_type", type=str, default="z-norm",
                         choices=["z-norm", "layer_norm", "rms_norm"],
                         help="Normalization type")
+    parser.add_argument("--topk_type", type=str, default="batch_topk",
+                        choices=["topk", "batch_topk"],
+                        help="TopK type: 'topk' for per-position, 'batch_topk' for sequence-level")
     parser.add_argument("--batch_size", type=int, default=4,
                         help="Batch size")
     parser.add_argument("--num_epochs", type=int, default=10,
@@ -448,6 +453,7 @@ def main():
         latent_dim=args.latent_dim,
         topk=args.topk,
         norm_type=args.norm_type,
+        topk_type=args.topk_type,
         batch_size=args.batch_size,
         num_epochs=args.num_epochs,
         learning_rate=args.learning_rate,

@@ -50,6 +50,7 @@ DEFAULT_CONFIG = {
     'latent_dim': 9000,  # 约 8.8x 扩展
     'topk': 256,         # 稀疏度 256/9000 ≈ 2.84%
     'norm_type': 'z-norm',
+    'topk_type': 'batch_topk',  # topk 或 batch_topk
     'batch_size': 4,
     'num_epochs': 20,
     'learning_rate': 1e-4,
@@ -229,6 +230,7 @@ def cmd_train_sae(args):
         latent_dim=args.latent_dim,
         topk=args.topk,
         norm_type=args.norm_type,
+        topk_type=args.topk_type,
         batch_size=args.batch_size,
         num_epochs=args.num_epochs,
         learning_rate=args.learning_rate,
@@ -1082,6 +1084,9 @@ def main():
     p1.add_argument('--latent_dim', type=int, default=DEFAULT_CONFIG['latent_dim'])
     p1.add_argument('--topk', type=int, default=DEFAULT_CONFIG['topk'])
     p1.add_argument('--norm_type', default=DEFAULT_CONFIG['norm_type'])
+    p1.add_argument('--topk_type', default=DEFAULT_CONFIG['topk_type'],
+                    choices=['topk', 'batch_topk'],
+                    help="TopK type: 'topk' for per-position, 'batch_topk' for sequence-level")
     p1.add_argument('--batch_size', type=int, default=DEFAULT_CONFIG['batch_size'])
     p1.add_argument('--num_epochs', type=int, default=DEFAULT_CONFIG['num_epochs'])
     p1.add_argument('--learning_rate', type=float, default=DEFAULT_CONFIG['learning_rate'])
