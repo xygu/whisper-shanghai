@@ -2,9 +2,62 @@
 python run_asr_tact.py train_sae --config asr_tact/config.yaml
 
 # 2. 分析神经元 (生成 LLM prompt)
-python run_asr_tact.py analyze --sae_checkpoint exp/asr_tact/sae/best_model.pt
+python run_asr_tact.py analyze --sae_checkpoint exp/asr_tact/sae/sae-layer12-260322-042557/best_model.pt
+
+
+# 在有 SAE 模型的服务器上运行
+python asr_tact/compute_sae_stats.py \
+    --sae_checkpoint exp/asr_tact/sae/exp/asr_tact/sae/sae-layer12-260322-042557/best_model.pt/best_model.pt \
+    --max_samples 4000 \
+    --output exp/asr_tact/sae_stats.json
+
+
+python run_asr_tact.py analyze \
+    --sae_checkpoint exp/asr_tact/sae/sae-layer12-260322-042557/best_model.pt \
+    --output_dir exp/asr_tact/neuron_analysis_v2 \
+    --max_samples 4000
+
 
 # 3. 训练门控 LoRA
-python run_asr_tact.py train_gated_lora \
+# python run_asr_tact.py train_gated_lora \
     --sae_checkpoint exp/asr_tact/sae/best_model.pt \
     --analysis_dir exp/asr_tact/neuron_analysis/analysis-xxx
+
+    python run_asr_tact.py train_gated_lora \
+    --sae_checkpoint exp/asr_tact/sae/sae-layer12-260322-042557/best_model.pt \
+    --analysis_dir exp/asr_tact/neuron_analysis_v2 \
+    --output_dir exp/asr_tact/gated_lora
+
+#推理测试
+python run_asr_tact.py inference \
+    --model_path exp/asr_tact/gated_lora \
+    --audio_path test.wav
+
+=========NEW==========
+# Step 1: 训练 SAE (latent_dim=9000, topk=100)
+python asr_tact/run_full_pipeline.py train_sae
+
+# Step 2: 统计量汇报 (死亡神经元率、R²、稀疏度)
+python asr_tact/run_full_pipeline.py compute_stats --sae_checkpoint exp/sae/xxx/best_model.pt
+
+# Step 3: 找最差 1/10 样本
+python asr_tact/run_full_pipeline.py find_worst --sae_checkpoint exp/sae/xxx/best_model.pt
+
+# Step 4: 反事实优化找 top10 神经元
+python asr_tact/run_full_pipeline.py counterfactual \
+  --sae_checkpoint exp/sae/xxx/best_model.pt \
+  --worst_samples_path exp/sae/xxx/worst_samples.json
+
+# Step 5: 提取神经元激活的 token 特征
+python asr_tact/run_full_pipeline.py extract_features \
+  --sae_checkpoint exp/sae/xxx/best_model.pt \
+  --key_neurons_path exp/sae/xxx/key_neurons.json
+
+# Step 6: 生成 LLM 解释 prompt
+python asr_tact/run_full_pipeline.py generate_prompt \
+  --features_path exp/sae/xxx/neuron_features.json
+
+# Step 7: 门控 LoRA 微调 (使用 TaCT 比例 48 个神经元)
+python asr_tact/run_full_pipeline.py train_lora \
+  --sae_checkpoint exp/sae/xxx/best_model.pt \
+  --key_neurons_path exp/sae/xxx/key_neurons.json
