@@ -216,8 +216,9 @@ class CounterfactualAnalyzer:
             
             # 更新 delta
             with torch.no_grad():
-                delta = delta - self.learning_rate * delta.grad
-                delta = delta * mask_mean  # 只更新被激活的神经元
+                if delta.grad is not None:
+                    delta = delta - self.learning_rate * delta.grad
+                    delta = delta * mask_mean  # 只更新被激活的神经元
                 delta = delta.detach()
                 delta.requires_grad_(True)
         

@@ -49,14 +49,14 @@ nohup python asr_tact/run_full_pipeline.py train_sae \
 
 ### 配置 D（Layer 18，深层）
 ```bash
-nohup python asr_tact/run_full_pipeline.py train_sae \
+nohup CUDA_VISIBLE_DEVICES=1 python -m asr_tact/run_full_pipeline.py train_sae \
     --model_name exp/whisper-shanghai-260318-004259 \
-    --latent_dim 15000 \
-    --topk 500 \
+    --latent_dim 6000 \
+    --topk 300 \
     --norm_type layer_norm \
     --topk_type topk \
     --encoder_layer 18 \
-    --dead_neuron_threshold 1e6 \
+    --dead_neuron_threshold 1e5 \
     --num_epochs 20 \
     --output_dir ./exp/sae_config_D \
     > nohup_config_D.out 2>&1 &
@@ -76,7 +76,7 @@ python asr_tact/run_full_pipeline.py compute_stats \
 
 # 配置 C
 python asr_tact/run_full_pipeline.py compute_stats \
-    --sae_checkpoint ./exp/sae_config_C/sae-layer8-XXXXXX/best_model.pt \
+    --sae_checkpoint ./exp/sae_config_C/sae-layer8-260323-174548/best_model.pt \
     --model_name exp/whisper-shanghai-260318-004259
 
 # 配置 D
@@ -100,9 +100,9 @@ python asr_tact/run_full_pipeline.py find_worst \
 
 # 配置 C
 python asr_tact/run_full_pipeline.py find_worst \
-    --sae_checkpoint ./exp/sae_config_C/sae-layer8-XXXXXX/best_model.pt \
+    --sae_checkpoint ./exp/sae_config_C/sae-layer8-260323-174548/best_model.pt \
     --model_name exp/whisper-shanghai-260318-004259 \
-    --output_dir ./exp/sae_config_C
+    --output_path ./exp/sae_config_C
 
 # 配置 D
 python asr_tact/run_full_pipeline.py find_worst \
@@ -126,11 +126,11 @@ python asr_tact/run_full_pipeline.py counterfactual \
     --output_dir ./exp/sae_config_B/counterfactual
 
 # 配置 C
-python asr_tact/run_full_pipeline.py counterfactual \
-    --sae_checkpoint ./exp/sae_config_C/sae-layer8-XXXXXX/best_model.pt \
+nohup python asr_tact/run_full_pipeline.py counterfactual \
+    --sae_checkpoint ./exp/sae_config_C/sae-layer8-260323-174548/best_model.pt \
     --worst_samples_path ./exp/sae_config_C/worst_samples.json \
     --model_name exp/whisper-shanghai-260318-004259 \
-    --output_dir ./exp/sae_config_C/counterfactual
+    --output_dir ./exp/sae_config_C/counterfactual > nohup_config_C_counterfactual.out 2>&1 &
 
 # 配置 D
 python asr_tact/run_full_pipeline.py counterfactual \
@@ -155,11 +155,11 @@ python asr_tact/run_full_pipeline.py extract_features \
     --output_dir ./exp/sae_config_B/features
 
 # 配置 C
-python asr_tact/run_full_pipeline.py extract_features \
-    --sae_checkpoint ./exp/sae_config_C/sae-layer8-XXXXXX/best_model.pt \
+nohup python asr_tact/run_full_pipeline.py extract_features \
+    --sae_checkpoint ./exp/sae_config_C/sae-layer8-260323-174548/best_model.pt \
     --key_neurons_path ./exp/sae_config_C/counterfactual/key_neurons.json \
     --model_name exp/whisper-shanghai-260318-004259 \
-    --output_dir ./exp/sae_config_C/features
+    --output_dir ./exp/sae_config_C/features > nohup_config_C_features.out 2>&1 &
 
 # 配置 D
 python asr_tact/run_full_pipeline.py extract_features \
@@ -209,7 +209,7 @@ nohup python asr_tact/run_full_pipeline.py train_lora \
 
 # 配置 C
 nohup python asr_tact/run_full_pipeline.py train_lora \
-    --sae_checkpoint ./exp/sae_config_C/sae-layer8-XXXXXX/best_model.pt \
+    --sae_checkpoint ./exp/sae_config_C/sae-layer8-260323-174548/best_model.pt \
     --key_neurons_path ./exp/sae_config_C/counterfactual/key_neurons.json \
     --model_name exp/whisper-shanghai-260318-004259 \
     --output_dir ./exp/sae_config_C/gated_lora \
@@ -222,6 +222,16 @@ nohup python asr_tact/run_full_pipeline.py train_lora \
     --model_name exp/whisper-shanghai-260318-004259 \
     --output_dir ./exp/sae_config_D/gated_lora \
     > nohup_lora_D.out 2>&1 &
+
+# 改进版C
+nohup python asr_tact/run_full_pipeline.py train_lora \
+    --sae_checkpoint ./exp/sae_config_C/sae-layer8-260323-174548/best_model.pt \
+    --key_neurons_path ./exp/sae_config_C/counterfactual/key_neurons.json \
+    --model_name exp/whisper-shanghai-260318-004259 \
+    --output_dir ./exp/sae_config_C/gated_lora \
+    --translation_model exp/translation-mt5-small-260320-231422/final_model \
+    --eval_dataset_path dataset/shanghai/shanghai_unified_dataset \
+    > nohup_lora_C.out 2>&1 &
 ```
 
 ---

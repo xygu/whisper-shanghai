@@ -20,9 +20,11 @@ import numpy as np
 
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 from datasets import load_from_disk, Audio
+import torch.nn.functional as F
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from asr_tact.sae import SAE, SAEConfig
+from asr_tact.data_utils import audio_length_to_encoder_length
 
 
 def extract_encoder_hidden_states(
@@ -108,6 +110,7 @@ def compute_sae_statistics(
     print(f"Processing {len(samples)} samples...")
     for sample in tqdm(samples, desc="Computing statistics"):
         audio_array = sample['audio']['array']
+        audio_length = len(audio_array)
         
         # 处理音频
         input_features = processor(
@@ -122,13 +125,20 @@ def compute_sae_statistics(
                 whisper_model, input_features, layer=encoder_layer
             )
             
+            # 计算 attention_mask（与训练时一致）
+            encoder_seq_len = audio_length_to_encoder_length(audio_length)
+            actual_seq_len = hidden_states.shape[1]  # Whisper encoder 输出固定为 1500
+            attention_mask = torch.zeros(1, actual_seq_len, device=device)
+            attention_mask[:, :min(encoder_seq_len, actual_seq_len)] = 1.0
+            
             # SAE 前向传播
             sparse_recover, aux_recover, sparse = sae(hidden_states, topk)
             
-            # 计算方差解释率
-            x = hidden_states
-            explained_var = 1 - ((x - sparse_recover).var(dim=-2) / (x.var(dim=-2) + 1e-6)).mean()
-            explained_vars.append(explained_var.item())
+            # 使用 SAE 的 compute_loss 计算方差解释率（与训练时完全一致）
+            _, loss_dict = sae.compute_loss(
+                hidden_states, sparse_recover, aux_recover, attention_mask
+            )
+            explained_vars.append(loss_dict['explained_var'])
             
             # 统计激活（使用 topk 后的稀疏激活，而不是 ReLU 后的）
             batch_size, seq_len, _ = sparse.shape

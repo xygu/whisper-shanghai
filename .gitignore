@@ -12,7 +12,14 @@ thumbs.db
 pretrained_models/*
 dataset/*
 *.pt
-exp/
+
+exp/*
+!exp/sae_config_C/
+exp/sae_config_C/*
+!exp/sae_config_C/llm_prompts/
+!exp/sae_config_C/llm_prompts/*
+
+
 wandb/
 whisper-shanghai-finetuned/
 temp/
